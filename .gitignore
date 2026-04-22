@@ -1,0 +1,36 @@
+# 媒体文件（关键！）
+media/
+chroma_db/
+
+# 数据库
+db.sqlite3
+*.sqlite3
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 虚拟环境
+venv/
+env/
+.venv
+Lib/
+Scripts/
+
+# IDE配置
+.idea/
+.vscode/
+*.swp
+
+# 日志文件
+*.log
+debug-*.log
+
+# 文档文件（可选）
+*.docx
+*.doc
+
+# 前端依赖
+frontend/node_modules/
+frontend/.next/
