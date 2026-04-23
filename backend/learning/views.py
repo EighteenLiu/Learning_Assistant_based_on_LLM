@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+import mimetypes
 import threading
 import re
 from pathlib import Path
@@ -326,7 +327,10 @@ class ExportTranslatedPPTView(APIView):
 
         safe_title = re.sub(r'[\\/:*?"<>|]+', "_", str(courseware.title or "").strip()) or f"courseware_{courseware.id}"
         filename = f"{safe_title}_translated{output_path.suffix.lower()}"
-        return FileResponse(open(output_path, "rb"), as_attachment=True, filename=filename)
+        content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        response = FileResponse(open(output_path, "rb"), as_attachment=True, filename=filename, content_type=content_type)
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
 
 class CoursewareSlidesView(APIView):

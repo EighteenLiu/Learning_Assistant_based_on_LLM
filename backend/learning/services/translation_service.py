@@ -20,6 +20,7 @@ from learning.models import Courseware, SlideContent, TermDictionary, Translatio
 
 from .image_processing_service import ImageProcessingService
 from .llm_client import ChatMessage, OpenAICompatibleClient
+from .ppt_parser_service import PPTParserService
 
 
 class TranslationService:
@@ -667,6 +668,14 @@ class TranslationService:
                     }
                 )
 
+        is_pdf_source = False
+        try:
+            is_pdf_source = PPTParserService.is_pdf_file(slide.courseware.file.path)
+        except Exception:
+            is_pdf_source = False
+        if is_pdf_source:
+            source_containers = PPTParserService.dedupe_pdf_repeated_short_phrases(source_containers)
+
         text_containers = [item for item in source_containers if str(item.get("kind", "")) != "image_ocr"]
         image_containers = [item for item in source_containers if str(item.get("kind", "")) == "image_ocr"]
 
@@ -731,7 +740,16 @@ class TranslationService:
             "blocks": translated_blocks,
             "text_containers": translated_containers,
         }
-        base_source_text = str(slide.source_text or "").strip()
+        if is_pdf_source:
+            base_source_text = "\n".join(
+                [
+                    str(container.get("text", "")).strip()
+                    for container in text_containers
+                    if str(container.get("text", "")).strip()
+                ]
+            ).strip()
+        else:
+            base_source_text = str(slide.source_text or "").strip()
         deduped_ocr: list[str] = []
         for item in source_ocr_texts:
             value = str(item or "").strip()

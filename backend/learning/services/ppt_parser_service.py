@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
@@ -20,6 +22,10 @@ class ParsedSlide:
 
 class PPTParserService:
     ROW_TOLERANCE = 0.02
+    PDF_SHORT_PHRASE_MAX_CHARS = 32
+    PDF_SHORT_PHRASE_MAX_LINES = 2
+    PDF_SHORT_PHRASE_MAX_WORDS = 6
+    PDF_SHORT_PHRASE_REPEAT_THRESHOLD = 3
     SUPPORTED_FORMATS = (".pptx", ".ppt", ".pdf")
     PPT_FORMATS = (".pptx", ".ppt")
     PDF_FORMATS = (".pdf",)
@@ -486,6 +492,75 @@ class PPTParserService:
         return paragraphs, font_name, preferred_size
 
     @staticmethod
+    def _pdf_text_fingerprint(text: str) -> str:
+        normalized = PPTParserService._normalize_text(text)
+        if not normalized:
+            return ""
+        normalized = re.sub(r"\s+", " ", normalized).strip().casefold()
+        return normalized
+
+    @staticmethod
+    def _is_repeated_pdf_short_phrase(text: str) -> bool:
+        normalized = PPTParserService._normalize_text(text)
+        if not normalized:
+            return False
+
+        lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+        if len(lines) > PPTParserService.PDF_SHORT_PHRASE_MAX_LINES:
+            return False
+
+        flattened = re.sub(r"\s+", " ", normalized).strip()
+        if len(flattened) > PPTParserService.PDF_SHORT_PHRASE_MAX_CHARS:
+            return False
+
+        words = [word for word in flattened.split(" ") if word]
+        if len(words) > PPTParserService.PDF_SHORT_PHRASE_MAX_WORDS:
+            return False
+
+        meaningful_chars = [char for char in flattened if char.isalnum() or ("\u4e00" <= char <= "\u9fff")]
+        return len(meaningful_chars) >= 2
+
+    @staticmethod
+    def dedupe_pdf_repeated_short_phrases(containers: list[dict]) -> list[dict]:
+        if not containers:
+            return []
+
+        repeated_candidates: Counter[str] = Counter()
+        for container in containers:
+            if str(container.get("kind", "")) == "image_ocr":
+                continue
+            text = str(container.get("text", "")).strip()
+            if not PPTParserService._is_repeated_pdf_short_phrase(text):
+                continue
+            fingerprint = PPTParserService._pdf_text_fingerprint(text)
+            if fingerprint:
+                repeated_candidates[fingerprint] += 1
+
+        duplicate_keys = {
+            key
+            for key, count in repeated_candidates.items()
+            if count >= PPTParserService.PDF_SHORT_PHRASE_REPEAT_THRESHOLD
+        }
+        if not duplicate_keys:
+            return list(containers)
+
+        deduped: list[dict] = []
+        seen_short_phrases: set[str] = set()
+        for container in containers:
+            if str(container.get("kind", "")) == "image_ocr":
+                deduped.append(container)
+                continue
+
+            fingerprint = PPTParserService._pdf_text_fingerprint(str(container.get("text", "")).strip())
+            if fingerprint in duplicate_keys:
+                if fingerprint in seen_short_phrases:
+                    continue
+                seen_short_phrases.add(fingerprint)
+            deduped.append(container)
+
+        return deduped
+
+    @staticmethod
     def _mark_pdf_titles(containers: list[dict]) -> None:
         text_containers = [item for item in containers if str(item.get("kind", "")) != "image_ocr" and str(item.get("text", "")).strip()]
         if not text_containers:
@@ -541,6 +616,7 @@ class PPTParserService:
         try:
             document = fitz.open(str(path.resolve()))
             parsed: list[ParsedSlide] = []
+            total_deduped_containers = 0
 
             for index, page in enumerate(document, start=1):
                 page_rect = page.rect
@@ -611,6 +687,9 @@ class PPTParserService:
                         }
                     )
 
+                original_count = len(containers)
+                containers = PPTParserService.dedupe_pdf_repeated_short_phrases(containers)
+                total_deduped_containers += max(original_count - len(containers), 0)
                 PPTParserService._mark_pdf_titles(containers)
                 title, source_text, source_layout = PPTParserService._finalize_layout(
                     containers,
@@ -634,6 +713,7 @@ class PPTParserService:
                 message="Parsed PDF pages",
                 data={
                     "slide_count": len(parsed),
+                    "deduped_container_count": total_deduped_containers,
                     "suffix": path.suffix.lower(),
                     "exists": path.exists(),
                     "is_file": path.is_file(),

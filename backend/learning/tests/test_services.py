@@ -78,6 +78,19 @@ class PPTParserServiceTests(TestCase):
 
         self.assertEqual(title, "Visible Slide Title")
 
+    def test_dedupe_pdf_repeated_short_phrases_keeps_only_one_short_repeat(self):
+        containers = [
+            {"kind": "text_frame", "text": "CONFIDENTIAL", "x": 0.1, "y": 0.1},
+            {"kind": "text_frame", "text": "CONFIDENTIAL", "x": 0.3, "y": 0.2},
+            {"kind": "text_frame", "text": "CONFIDENTIAL", "x": 0.5, "y": 0.3},
+            {"kind": "text_frame", "text": "Main body content", "x": 0.1, "y": 0.5},
+        ]
+
+        deduped = PPTParserService.dedupe_pdf_repeated_short_phrases(containers)
+
+        self.assertEqual(len(deduped), 2)
+        self.assertEqual([item["text"] for item in deduped], ["CONFIDENTIAL", "Main body content"])
+
 
 class PromptAndSummaryTests(TestCase):
     def setUp(self):
@@ -98,6 +111,81 @@ class PromptAndSummaryTests(TestCase):
                 ],
             },
         )
+
+    def test_build_translated_layout_dedupes_existing_pdf_watermark_containers(self):
+        self.courseware.file = "coursewares/fake.pdf"
+        self.courseware.save(update_fields=["file"])
+        slide = self.courseware.slides.first()
+        slide.source_text = "CONFIDENTIAL\nCONFIDENTIAL\nCore lesson"
+        slide.source_layout = {
+            "page_width": 1280,
+            "page_height": 720,
+            "text_containers": [
+                {
+                    "container_id": 1,
+                    "kind": "text_frame",
+                    "paragraphs": ["CONFIDENTIAL"],
+                    "text": "CONFIDENTIAL",
+                    "x": 0.1,
+                    "y": 0.1,
+                    "w": 0.2,
+                    "h": 0.05,
+                },
+                {
+                    "container_id": 2,
+                    "kind": "text_frame",
+                    "paragraphs": ["CONFIDENTIAL"],
+                    "text": "CONFIDENTIAL",
+                    "x": 0.3,
+                    "y": 0.2,
+                    "w": 0.2,
+                    "h": 0.05,
+                },
+                {
+                    "container_id": 3,
+                    "kind": "text_frame",
+                    "paragraphs": ["CONFIDENTIAL"],
+                    "text": "CONFIDENTIAL",
+                    "x": 0.5,
+                    "y": 0.3,
+                    "w": 0.2,
+                    "h": 0.05,
+                },
+                {
+                    "container_id": 4,
+                    "kind": "text_frame",
+                    "paragraphs": ["Core lesson"],
+                    "text": "Core lesson",
+                    "x": 0.1,
+                    "y": 0.5,
+                    "w": 0.4,
+                    "h": 0.08,
+                },
+            ],
+            "blocks": [],
+        }
+        slide.save(update_fields=["source_text", "source_layout"])
+
+        translator = TranslationService()
+        with patch.object(
+            TranslationService,
+            "_translate_containers",
+            side_effect=lambda containers, term_hint: {
+                int(container["container_id"]): {
+                    "text": f"ZH:{container['text']}",
+                    "paragraphs": [f"ZH:{container['text']}"],
+                }
+                for container in containers
+            },
+        ), patch.object(TranslationService, "_translate_image_containers", return_value=({}, {})):
+            translated_text, translated_layout, enhanced_source_text = translator._build_translated_layout(slide, "")
+
+        self.assertEqual(
+            [item["text"] for item in translated_layout["text_containers"]],
+            ["ZH:CONFIDENTIAL", "ZH:Core lesson"],
+        )
+        self.assertEqual(enhanced_source_text, "CONFIDENTIAL\nCore lesson")
+        self.assertEqual(translated_text, "ZH:CONFIDENTIAL\nZH:Core lesson")
 
     @patch("learning.services.translation_service.ImageProcessingService.process_all_slides", return_value={})
     @patch("learning.services.llm_client.OpenAICompatibleClient.chat")

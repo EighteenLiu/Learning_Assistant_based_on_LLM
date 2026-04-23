@@ -873,12 +873,19 @@ const downloadTranslatedPpt = async () => {
     const response = await http.get(`/coursewares/${selected}/export-translated-ppt`, {
       responseType: "blob",
     });
-    const blob = response.data as Blob;
     const disposition = String(response.headers?.["content-disposition"] || "");
     const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
     const plainMatch = disposition.match(/filename="?([^\";]+)"?/i);
     const rawFilename = utf8Match?.[1] || plainMatch?.[1] || `courseware_${selected}_translated`;
     const filename = decodeURIComponent(rawFilename);
+    const expectedMime = filename.toLowerCase().endsWith(".pdf")
+      ? "application/pdf"
+      : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    const serverBlob = response.data as Blob;
+    const blob =
+      serverBlob?.type && serverBlob.type !== "application/xml" && serverBlob.type !== "text/xml"
+        ? serverBlob
+        : new Blob([serverBlob], { type: expectedMime });
 
     const link = document.createElement("a");
     const href = URL.createObjectURL(blob);
