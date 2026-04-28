@@ -1,36 +1,45 @@
-# 媒体文件（关键！）
-media/
-chroma_db/
+# Environment and secrets
+.env
+*.env
+backend/.env
+!.env.example
+!backend/.env.example
 
-# 数据库
-db.sqlite3
-*.sqlite3
-
-# Python 缓存
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-
-# 虚拟环境
+.pytest_cache/
+.venv/
 venv/
 env/
-.venv
-Lib/
-Scripts/
 
-# IDE配置
+# Django/local data
+db.sqlite3
+*.sqlite3
+media/
+backend/media/
+chroma_db/
+backend/chroma_db/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.next/
+
+# IDE/editor
 .idea/
 .vscode/
 *.swp
 
-# 日志文件
+# Logs
 *.log
 debug-*.log
 
-# 文档文件（可选）
+# Generated documents and local thesis artifacts
 *.docx
 *.doc
-
-# 前端依赖
-frontend/node_modules/
-frontend/.next/
+thesis_inputs/
+thesis_outputs/
+tools/generated_figures/
