@@ -1,15 +1,29 @@
 :root {
-  --bg: #f7f4ee;
-  --panel: rgba(255, 252, 247, 0.86);
+  --bg: #f3ede3;
+  --surface: rgba(255, 252, 247, 0.76);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --surface-alt: rgba(250, 244, 235, 0.88);
+  --panel: rgba(255, 252, 247, 0.84);
   --panel-strong: rgba(255, 255, 255, 0.95);
-  --text: #112031;
-  --muted: #617286;
-  --line: rgba(120, 136, 158, 0.18);
-  --accent: #d97706;
-  --accent-strong: #c2410c;
-  --accent-cool: #0f766e;
-  --shadow: 0 24px 60px rgba(17, 32, 49, 0.08);
-  --shadow-soft: 0 14px 34px rgba(17, 32, 49, 0.06);
+  --text: #142231;
+  --text-soft: #2f4254;
+  --muted: #68788b;
+  --line: rgba(98, 115, 136, 0.16);
+  --line-strong: rgba(98, 115, 136, 0.24);
+  --accent: #c96b2c;
+  --accent-strong: #a94c16;
+  --accent-cool: #166a6d;
+  --accent-cool-strong: #0f5255;
+  --accent-ink: #7f3d17;
+  --glow-warm: rgba(216, 119, 55, 0.22);
+  --glow-cool: rgba(34, 139, 139, 0.16);
+  --shadow: 0 30px 70px rgba(23, 36, 49, 0.09);
+  --shadow-soft: 0 18px 40px rgba(23, 36, 49, 0.07);
+  --shadow-float: 0 22px 44px rgba(23, 36, 49, 0.12);
+  --radius-xl: 32px;
+  --radius-lg: 24px;
+  --radius-md: 18px;
+  --radius-sm: 14px;
 }
 
 * {
@@ -26,16 +40,17 @@ body {
   min-height: 100vh;
   color: var(--text);
   font-family:
-    "Segoe UI Variable Display",
     "Avenir Next",
+    "Segoe UI Variable Display",
     "PingFang SC",
     "Microsoft YaHei UI",
     "Noto Sans SC",
     sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(245, 158, 11, 0.14), transparent 22%),
-    radial-gradient(circle at 84% 12%, rgba(56, 189, 248, 0.13), transparent 20%),
-    linear-gradient(180deg, #fbf8f3 0%, #f3efe7 100%);
+    radial-gradient(circle at top left, rgba(215, 119, 55, 0.18), transparent 24%),
+    radial-gradient(circle at 82% 10%, rgba(56, 189, 248, 0.14), transparent 18%),
+    radial-gradient(circle at 50% 100%, rgba(22, 106, 109, 0.08), transparent 28%),
+    linear-gradient(180deg, #fbf7f0 0%, #f2eadf 52%, #efe5d9 100%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -49,8 +64,17 @@ body::before {
   background-image:
     linear-gradient(rgba(17, 32, 49, 0.025) 1px, transparent 1px),
     linear-gradient(90deg, rgba(17, 32, 49, 0.025) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.22), transparent 78%);
+  background-size: 30px 30px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.16), transparent 76%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto 0 0;
+  height: 32vh;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.2));
 }
 
 button,
@@ -68,18 +92,24 @@ select {
   position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 32px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
   backdrop-filter: blur(16px);
   padding: 26px;
   overflow: hidden;
+  transition:
+    transform 0.28s ease,
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
 }
 
 .page-card::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 42%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), transparent 40%),
+    radial-gradient(circle at right top, rgba(255, 255, 255, 0.16), transparent 28%);
   pointer-events: none;
 }
 
@@ -89,7 +119,7 @@ select {
 }
 
 .glass-panel {
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -118,8 +148,8 @@ select {
 }
 
 .data-panel {
-  border-radius: 24px;
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line-strong);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.98));
 }
 
@@ -128,6 +158,15 @@ select {
   font-weight: 700;
   min-height: 42px;
   padding-inline: 18px;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+}
+
+.el-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 20px rgba(15, 23, 42, 0.08);
 }
 
 .el-button--primary {
@@ -135,19 +174,19 @@ select {
   --el-button-border-color: var(--accent);
   --el-button-hover-bg-color: var(--accent-strong);
   --el-button-hover-border-color: var(--accent-strong);
-  --el-button-active-bg-color: #9a3412;
-  --el-button-active-border-color: #9a3412;
+  --el-button-active-bg-color: #8f3d10;
+  --el-button-active-border-color: #8f3d10;
 }
 
 .el-button--success {
   --el-button-bg-color: var(--accent-cool);
   --el-button-border-color: var(--accent-cool);
-  --el-button-hover-bg-color: #0d9488;
-  --el-button-hover-border-color: #0d9488;
+  --el-button-hover-bg-color: var(--accent-cool-strong);
+  --el-button-hover-border-color: var(--accent-cool-strong);
 }
 
 .el-button.is-plain {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.78);
   border-color: rgba(148, 163, 184, 0.22);
 }
 
@@ -155,8 +194,23 @@ select {
 .el-textarea__inner,
 .el-select__wrapper {
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.14) inset !important;
+  transition: box-shadow 0.22s ease, transform 0.22s ease;
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover,
+.el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px rgba(201, 107, 44, 0.24) inset !important;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  box-shadow:
+    0 0 0 1px rgba(201, 107, 44, 0.4) inset,
+    0 0 0 4px rgba(201, 107, 44, 0.08) !important;
 }
 
 .el-checkbox__label,
@@ -176,6 +230,16 @@ select {
 
 .el-empty {
   padding-block: 18px;
+}
+
+.el-message {
+  border-radius: 18px;
+  box-shadow: var(--shadow-float);
+}
+
+::selection {
+  color: #fff;
+  background: rgba(201, 107, 44, 0.78);
 }
 
 .el-table {

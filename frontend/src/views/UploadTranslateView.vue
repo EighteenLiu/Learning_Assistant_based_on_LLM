@@ -1036,47 +1036,96 @@ onUnmounted(() => {
 <style scoped>
 .workspace-view {
   display: grid;
-  gap: 20px;
+  gap: 22px;
 }
 
 .section-kicker,
 .card-kicker {
   font-size: 12px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
+  font-weight: 700;
 }
 
 .editor-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.92fr) minmax(360px, 1.08fr);
-  gap: 18px;
+  gap: 20px;
 }
 
 .section-heading h3,
 .panel-head h3 {
-  margin: 8px 0 0;
-  font-size: 28px;
-  line-height: 1.08;
+  margin: 10px 0 0;
+  font-size: 29px;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
 }
 
 .section-heading p,
 .panel-head p {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   color: var(--muted);
-  line-height: 1.85;
+  line-height: 1.88;
+  max-width: 70ch;
+}
+
+.upload-panel,
+.status-panel,
+.compare-panel,
+.qa-panel,
+.summary-panel {
+  position: relative;
+}
+
+.upload-panel::before,
+.status-panel::before,
+.compare-panel::before,
+.qa-panel::before,
+.summary-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 26px;
+  right: 26px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(201, 107, 44, 0.8), rgba(22, 106, 109, 0.38), transparent 84%);
+}
+
+.upload-panel {
+  background:
+    radial-gradient(circle at right top, rgba(201, 107, 44, 0.12), transparent 26%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.92), rgba(251, 245, 238, 0.88));
+}
+
+.status-panel {
+  background:
+    radial-gradient(circle at right top, rgba(22, 106, 109, 0.09), transparent 26%),
+    linear-gradient(180deg, rgba(251, 254, 253, 0.94), rgba(244, 248, 247, 0.88));
 }
 
 .file-dropzone {
   position: relative;
   display: block;
   border: 1px dashed rgba(184, 92, 56, 0.5);
-  border-radius: 24px;
-  padding: 22px;
+  border-radius: 26px;
+  padding: 26px 24px;
   background:
-    radial-gradient(circle at right top, rgba(184, 92, 56, 0.08), transparent 30%),
+    radial-gradient(circle at right top, rgba(184, 92, 56, 0.14), transparent 30%),
+    radial-gradient(circle at left bottom, rgba(22, 106, 109, 0.08), transparent 28%),
     linear-gradient(180deg, rgba(255, 247, 238, 0.92), rgba(255, 253, 249, 0.98));
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.file-dropzone:hover {
+  transform: translateY(-1px);
+  border-color: rgba(184, 92, 56, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    0 16px 28px rgba(184, 92, 56, 0.08);
 }
 
 .file-input {
@@ -1087,14 +1136,15 @@ onUnmounted(() => {
 }
 
 .dropzone-label {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
 }
 
 .dropzone-file {
-  margin-top: 10px;
+  margin-top: 12px;
   color: var(--muted);
   line-height: 1.7;
+  font-size: 14px;
 }
 
 .status-panel {
@@ -1107,11 +1157,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  margin-top: 18px;
-  padding: 10px 16px;
+  margin-top: 20px;
+  padding: 11px 18px;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .status-chip.is-neutral {
@@ -1135,34 +1186,44 @@ onUnmounted(() => {
 }
 
 .status-list {
-  margin-top: 18px;
+  margin-top: 20px;
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .status-item {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
   gap: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(122, 104, 86, 0.12);
+  padding: 14px 15px;
+  border-radius: 18px;
+  border: 1px solid rgba(122, 104, 86, 0.1);
+  background: rgba(255, 255, 255, 0.72);
   line-height: 1.6;
+  min-height: 92px;
 }
 
 .status-item span {
   color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .status-item strong {
-  text-align: right;
+  text-align: left;
+  font-size: 17px;
+  line-height: 1.45;
 }
 
 .status-note {
-  margin-top: 18px;
-  padding: 18px;
-  border-radius: 22px;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 24px;
   background: linear-gradient(180deg, rgba(255, 252, 247, 0.96), rgba(248, 242, 233, 0.88));
   border: 1px solid rgba(122, 104, 86, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .status-note strong {
@@ -1191,7 +1252,7 @@ onUnmounted(() => {
 .qa-panel,
 .summary-panel {
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .panel-head {
@@ -1200,21 +1261,25 @@ onUnmounted(() => {
   gap: 20px;
   align-items: flex-start;
   flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(98, 115, 136, 0.12);
 }
 
 .panel-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .scope-badge {
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(122, 104, 86, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 252, 0.78));
+  border: 1px solid rgba(122, 104, 86, 0.14);
   color: var(--muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .scope-badge span {
@@ -1238,10 +1303,12 @@ onUnmounted(() => {
 .compare-empty {
   padding: 44px 24px;
   text-align: center;
-  border-radius: 24px;
+  border-radius: 26px;
   color: var(--muted);
   border: 1px dashed rgba(122, 104, 86, 0.28);
-  background: linear-gradient(180deg, rgba(255, 252, 247, 0.76), rgba(255, 255, 255, 0.9));
+  background:
+    radial-gradient(circle at top, rgba(201, 107, 44, 0.06), transparent 32%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.76), rgba(255, 255, 255, 0.9));
 }
 
 .compare-grid {
@@ -1258,12 +1325,13 @@ onUnmounted(() => {
 }
 
 .preview-card {
-  padding: 16px;
+  padding: 18px;
   border-radius: 24px;
+  box-shadow: 0 16px 28px rgba(17, 32, 49, 0.05);
 }
 
 .preview-title {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   font-size: 15px;
   font-weight: 700;
   color: var(--text-soft);
@@ -1273,14 +1341,16 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   min-height: 420px;
-  border-radius: 18px;
-  border: 1px solid rgba(122, 104, 86, 0.14);
+  border-radius: 20px;
+  border: 1px solid rgba(122, 104, 86, 0.12);
   background: linear-gradient(180deg, rgba(247, 243, 236, 0.94), rgba(236, 230, 220, 0.84));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
 }
 
 .translated-stage {
   background:
     radial-gradient(circle at top right, rgba(212, 168, 95, 0.18), transparent 28%),
+    radial-gradient(circle at left bottom, rgba(22, 106, 109, 0.08), transparent 28%),
     linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(249, 244, 237, 0.96));
 }
 
@@ -1319,12 +1389,13 @@ onUnmounted(() => {
   word-break: break-word;
   line-height: 1.6;
   padding: 6px 8px;
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: var(--shadow-soft);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 22px rgba(17, 32, 49, 0.08);
   font-size: 14px;
   z-index: 1;
+  border: 1px solid rgba(98, 115, 136, 0.08);
 }
 
 .slide-block.image-ocr-overlay {
@@ -1341,12 +1412,13 @@ onUnmounted(() => {
 .copy-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .copy-card {
-  padding: 18px;
+  padding: 20px;
   border-radius: 22px;
+  box-shadow: 0 12px 22px rgba(17, 32, 49, 0.04);
 }
 
 .copy-card.full,
@@ -1357,7 +1429,9 @@ onUnmounted(() => {
 .copy-label {
   font-size: 13px;
   color: var(--muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .copy-head {
@@ -1386,20 +1460,22 @@ onUnmounted(() => {
   min-height: 44vh;
   max-height: 64vh;
   overflow-y: auto;
-  padding: 18px;
-  border-radius: 24px;
-  border: 1px solid rgba(122, 104, 86, 0.14);
+  padding: 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(122, 104, 86, 0.12);
   background:
     radial-gradient(circle at top right, rgba(81, 98, 76, 0.08), transparent 24%),
+    radial-gradient(circle at left bottom, rgba(201, 107, 44, 0.05), transparent 28%),
     linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(251, 247, 240, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .chat-bubble {
   max-width: min(88%, 900px);
-  padding: 14px 16px;
-  border-radius: 20px;
-  margin-bottom: 12px;
-  box-shadow: var(--shadow-soft);
+  padding: 15px 17px;
+  border-radius: 22px;
+  margin-bottom: 14px;
+  box-shadow: 0 14px 28px rgba(17, 32, 49, 0.07);
 }
 
 .chat-bubble.assistant {
@@ -1410,7 +1486,7 @@ onUnmounted(() => {
 .chat-bubble.user {
   margin-left: auto;
   color: #ffffff;
-  background: linear-gradient(135deg, #b85c38, #8f3f22);
+  background: linear-gradient(135deg, #c96b2c, #9f4217);
 }
 
 .bubble-head {
@@ -1525,8 +1601,9 @@ onUnmounted(() => {
 }
 
 .summary-card {
-  padding: 20px;
+  padding: 24px;
   border-radius: 24px;
+  box-shadow: 0 14px 28px rgba(17, 32, 49, 0.05);
 }
 
 .summary-card.warm {
@@ -1587,6 +1664,10 @@ onUnmounted(() => {
   .compare-grid,
   .copy-grid,
   .summary-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .status-list {
     grid-template-columns: 1fr;
   }
 

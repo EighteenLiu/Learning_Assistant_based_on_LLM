@@ -800,7 +800,7 @@ onUnmounted(() => {
 <style scoped>
 .records-page {
   display: grid;
-  gap: 20px;
+  gap: 22px;
 }
 
 .records-shell {
@@ -812,9 +812,10 @@ onUnmounted(() => {
 .records-kicker,
 .panel-kicker {
   font-size: 12px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
+  font-weight: 700;
 }
 
 .records-sidebar {
@@ -828,7 +829,10 @@ onUnmounted(() => {
   gap: 14px;
   max-height: calc(100vh - 120px);
   overflow: hidden;
-  box-shadow: 0 20px 42px rgba(58, 43, 31, 0.2);
+  box-shadow: 0 24px 48px rgba(58, 43, 31, 0.18);
+  background:
+    radial-gradient(circle at right top, rgba(201, 107, 44, 0.1), transparent 24%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(250, 245, 238, 0.9));
 }
 
 .sidebar-backdrop {
@@ -846,10 +850,10 @@ onUnmounted(() => {
   width: 34px;
   height: 34px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 12px;
   color: #4b3f34;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 10px 20px rgba(58, 43, 31, 0.18);
+  box-shadow: 0 12px 24px rgba(58, 43, 31, 0.16);
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
@@ -871,8 +875,9 @@ onUnmounted(() => {
 }
 
 .sidebar-head h2 {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 30px;
+  line-height: 1.02;
 }
 
 .sidebar-head p {
@@ -888,20 +893,29 @@ onUnmounted(() => {
 
 .sidebar-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
 .courseware-item {
   border: 1px solid rgba(122, 104, 86, 0.14);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.76);
-  padding: 12px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 244, 237, 0.82));
+  padding: 14px;
   text-align: left;
   display: grid;
   gap: 6px;
   cursor: pointer;
+  box-shadow: 0 10px 18px rgba(17, 32, 49, 0.04);
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.courseware-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201, 107, 44, 0.24);
+  box-shadow: 0 14px 24px rgba(17, 32, 49, 0.08);
 }
 
 .courseware-item strong {
@@ -923,14 +937,16 @@ onUnmounted(() => {
 
 .courseware-item.active {
   border-color: rgba(184, 92, 56, 0.38);
-  background: linear-gradient(180deg, rgba(255, 247, 238, 0.9), rgba(255, 255, 255, 0.95));
+  background:
+    radial-gradient(circle at right top, rgba(201, 107, 44, 0.12), transparent 26%),
+    linear-gradient(180deg, rgba(255, 247, 238, 0.92), rgba(255, 255, 255, 0.96));
 }
 
 .records-main {
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .current-panel,
@@ -938,6 +954,20 @@ onUnmounted(() => {
 .record-panel {
   display: grid;
   gap: 14px;
+  position: relative;
+}
+
+.current-panel::before,
+.compare-panel::before,
+.record-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 26px;
+  right: 26px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(201, 107, 44, 0.75), rgba(22, 106, 109, 0.34), transparent 84%);
 }
 
 .current-head,
@@ -947,6 +977,8 @@ onUnmounted(() => {
   gap: 14px;
   align-items: flex-start;
   flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(98, 115, 136, 0.12);
 }
 
 .panel-actions {
@@ -954,14 +986,16 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .scope-badge {
   padding: 10px 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(122, 104, 86, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(247, 250, 252, 0.78));
+  border: 1px solid rgba(122, 104, 86, 0.14);
   color: var(--muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .scope-badge span {
@@ -979,10 +1013,12 @@ onUnmounted(() => {
 .compare-empty {
   padding: 22px 18px;
   text-align: center;
-  border-radius: 14px;
+  border-radius: 18px;
   color: var(--muted);
   border: 1px dashed rgba(122, 104, 86, 0.28);
-  background: linear-gradient(180deg, rgba(255, 252, 247, 0.76), rgba(255, 255, 255, 0.9));
+  background:
+    radial-gradient(circle at top, rgba(201, 107, 44, 0.05), transparent 32%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.76), rgba(255, 255, 255, 0.9));
 }
 
 .compare-grid {
@@ -999,7 +1035,8 @@ onUnmounted(() => {
 
 .preview-card {
   padding: 14px;
-  border-radius: 16px;
+  border-radius: 20px;
+  box-shadow: 0 14px 24px rgba(17, 32, 49, 0.05);
 }
 
 .preview-title {
@@ -1013,14 +1050,16 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   min-height: 260px;
-  border-radius: 14px;
-  border: 1px solid rgba(122, 104, 86, 0.14);
+  border-radius: 18px;
+  border: 1px solid rgba(122, 104, 86, 0.12);
   background: linear-gradient(180deg, rgba(247, 243, 236, 0.94), rgba(236, 230, 220, 0.84));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
 }
 
 .translated-stage {
   background:
     radial-gradient(circle at top right, rgba(212, 168, 95, 0.18), transparent 28%),
+    radial-gradient(circle at left bottom, rgba(22, 106, 109, 0.08), transparent 28%),
     linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(249, 244, 237, 0.96));
 }
 
@@ -1061,10 +1100,11 @@ onUnmounted(() => {
   padding: 6px 8px;
   border-radius: 12px;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: var(--shadow-soft);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 22px rgba(17, 32, 49, 0.08);
   font-size: 14px;
   z-index: 1;
+  border: 1px solid rgba(98, 115, 136, 0.08);
 }
 
 .slide-block.image-ocr-overlay {
@@ -1081,12 +1121,13 @@ onUnmounted(() => {
 .copy-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .copy-card {
-  padding: 14px;
-  border-radius: 14px;
+  padding: 16px;
+  border-radius: 18px;
+  box-shadow: 0 10px 20px rgba(17, 32, 49, 0.04);
 }
 
 .copy-label {
@@ -1120,10 +1161,12 @@ onUnmounted(() => {
 }
 
 .record-stat-card {
-  padding: 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  padding: 15px 16px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(249, 244, 237, 0.8));
   border: 1px solid rgba(122, 104, 86, 0.14);
+  box-shadow: 0 10px 20px rgba(17, 32, 49, 0.04);
 }
 
 .record-stat-card span {
@@ -1136,7 +1179,7 @@ onUnmounted(() => {
 .records-content-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr);
-  gap: 16px;
+  gap: 18px;
 }
 
 .qa-controls {
@@ -1151,26 +1194,43 @@ onUnmounted(() => {
 }
 
 .chat-shell {
-  min-height: 340px;
-  max-height: 560px;
+  position: relative;
+  min-height: 360px;
+  max-height: 600px;
   overflow-y: auto;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(122, 104, 86, 0.14);
+  padding: 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(122, 104, 86, 0.12);
   background:
     radial-gradient(circle at top right, rgba(81, 98, 76, 0.08), transparent 24%),
+    radial-gradient(circle at left bottom, rgba(201, 107, 44, 0.05), transparent 28%),
     linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(251, 247, 240, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.chat-shell::before {
+  content: "";
+  position: sticky;
+  top: -20px;
+  display: block;
+  height: 18px;
+  margin: -20px -20px 14px;
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.96), rgba(255, 250, 244, 0));
+  pointer-events: none;
+  z-index: 1;
 }
 
 .chat-bubble {
-  max-width: min(92%, 820px);
-  padding: 14px 16px;
-  border-radius: 18px;
-  margin-bottom: 12px;
-  box-shadow: var(--shadow-soft);
+  position: relative;
+  max-width: min(90%, 860px);
+  padding: 16px 18px;
+  border-radius: 22px;
+  margin-bottom: 14px;
+  box-shadow: 0 14px 28px rgba(17, 32, 49, 0.07);
 }
 
 .chat-bubble.assistant {
+  backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(122, 104, 86, 0.12);
 }
@@ -1178,7 +1238,9 @@ onUnmounted(() => {
 .chat-bubble.user {
   margin-left: auto;
   color: #ffffff;
-  background: linear-gradient(135deg, #b85c38, #8f3f22);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.16), transparent 30%),
+    linear-gradient(135deg, #c96b2c, #9f4217);
 }
 
 .bubble-head,
@@ -1191,31 +1253,33 @@ onUnmounted(() => {
 
 .bubble-head {
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .bubble-role,
 .bubble-time {
   font-size: 12px;
-  opacity: 0.82;
+  opacity: 0.78;
+  letter-spacing: 0.04em;
 }
 
 .bubble-scope {
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.2);
 }
 
 .chat-bubble.assistant .bubble-scope {
-  background: rgba(245, 239, 228, 0.92);
+  background: rgba(245, 239, 228, 0.96);
   color: #64584d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
 .bubble-content,
 .summary-blurb {
   white-space: pre-wrap;
-  line-height: 1.85;
+  line-height: 1.9;
 }
 
 .markdown-body {
@@ -1230,9 +1294,45 @@ onUnmounted(() => {
   margin-bottom: 0;
 }
 
+.markdown-body :deep(code) {
+  padding: 0.14em 0.42em;
+  border-radius: 8px;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.92em;
+  background: rgba(236, 230, 220, 0.9);
+}
+
+.markdown-body :deep(pre) {
+  margin: 12px 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border-radius: 16px;
+  background: #2c261f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.markdown-body :deep(pre code) {
+  padding: 0;
+  color: #f8efe2;
+  background: transparent;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 8px 0 12px;
+  padding-left: 22px;
+}
+
+.markdown-body :deep(blockquote) {
+  margin: 12px 0;
+  padding: 8px 0 8px 14px;
+  border-left: 4px solid rgba(184, 92, 56, 0.38);
+  color: var(--text-soft);
+}
+
 .bubble-citations,
 .summary-points {
-  margin-top: 12px;
+  margin-top: 14px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -1240,7 +1340,7 @@ onUnmounted(() => {
 
 .citation-chip,
 .point-chip {
-  padding: 6px 10px;
+  padding: 7px 11px;
   border-radius: 999px;
   border: 0;
   font-size: 12px;
@@ -1248,23 +1348,29 @@ onUnmounted(() => {
 
 .citation-chip {
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--text-soft);
+  box-shadow: 0 10px 20px rgba(17, 32, 49, 0.05);
 }
 
 .point-chip {
-  background: rgba(245, 239, 228, 0.92);
+  background: rgba(245, 239, 228, 0.96);
   color: #5f5349;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 .summary-highlight {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 247, 238, 0.94), rgba(255, 255, 255, 0.92));
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(201, 107, 44, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255, 247, 238, 0.94), rgba(255, 255, 255, 0.92));
   border: 1px solid rgba(184, 92, 56, 0.14);
+  box-shadow: 0 12px 22px rgba(17, 32, 49, 0.04);
 }
 
 .summary-highlight span {
@@ -1272,10 +1378,24 @@ onUnmounted(() => {
 }
 
 .knowledge-card {
-  padding: 16px;
-  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 24px;
   border: 1px solid rgba(122, 104, 86, 0.14);
-  background: linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(248, 243, 236, 0.94));
+  background:
+    radial-gradient(circle at top right, rgba(212, 168, 95, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(248, 243, 236, 0.94));
+  box-shadow: 0 18px 30px rgba(17, 32, 49, 0.05);
+}
+
+.knowledge-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, rgba(201, 107, 44, 0.75), rgba(22, 106, 109, 0.46));
+  opacity: 0.9;
 }
 
 .full-width-knowledge {
@@ -1287,40 +1407,51 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .knowledge-head h4 {
-  margin: 6px 0 0;
-  font-size: 22px;
+  margin: 8px 0 0;
+  font-size: 24px;
 }
 
 .knowledge-count {
-  padding: 8px 10px;
+  padding: 9px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.8);
-  color: var(--muted);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--text-soft);
   font-size: 12px;
+  border: 1px solid rgba(122, 104, 86, 0.12);
+  box-shadow: 0 10px 18px rgba(17, 32, 49, 0.04);
 }
 
 .summary-table {
-  border-radius: 12px;
+  margin-top: 14px;
+  border-radius: 16px;
   overflow: hidden;
+  border: 1px solid rgba(122, 104, 86, 0.12);
+  box-shadow: 0 10px 20px rgba(17, 32, 49, 0.03);
 }
 
 .learning-list {
   margin: 0;
   padding-left: 20px;
-  line-height: 1.85;
+  line-height: 1.9;
 }
 
 .learning-list li + li {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .mind-map-shell {
   overflow-x: auto;
-  padding: 8px 0 2px;
+  margin-top: 14px;
+  padding: 14px 12px 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(122, 104, 86, 0.12);
+  background:
+    radial-gradient(circle at top right, rgba(81, 98, 76, 0.06), transparent 26%),
+    linear-gradient(180deg, rgba(255, 252, 247, 0.9), rgba(250, 246, 240, 0.96));
 }
 
 .mind-map-root {
@@ -1328,7 +1459,7 @@ onUnmounted(() => {
   justify-content: center;
   min-width: fit-content;
   margin: 0;
-  padding: 0 8px;
+  padding: 0 10px;
 }
 
 @media (max-width: 1180px) {
@@ -1347,12 +1478,47 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  .chat-shell {
+    min-height: 320px;
+    max-height: none;
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .chat-shell::before {
+    top: -16px;
+    margin: -16px -16px 12px;
+  }
+
+  .chat-bubble {
+    max-width: 100%;
+    padding: 14px 15px;
+    border-radius: 18px;
+  }
+
+  .summary-highlight,
+  .knowledge-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .knowledge-card,
+  .preview-card,
+  .copy-card {
+    border-radius: 20px;
+  }
+
   .slide-select {
     min-width: 100%;
   }
 
   .slide-canvas {
     min-height: 210px;
+  }
+
+  .mind-map-shell {
+    padding: 12px 8px 6px;
+    border-radius: 16px;
   }
 }
 </style>

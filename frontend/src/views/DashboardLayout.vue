@@ -7,39 +7,9 @@
         <p class="topbar-subtitle">
           以一体化的智能工作台，重塑课件从解析、翻译、研读到复盘的完整体验，让每一份内容都能以更专业、更流畅的方式被理解、沉淀与再利用。
         </p>
-
-        <div class="topbar-meta">
-          <div class="meta-card">
-            <span>当前课件</span>
-            <strong>{{ currentCoursewareTitle }}</strong>
-          </div>
-          <div class="meta-card">
-            <span>课件总数</span>
-            <strong>{{ coursewares.length }}</strong>
-          </div>
-        </div>
       </div>
 
       <div class="topbar-actions">
-        <div class="control-card">
-          <span class="control-label">切换课件</span>
-          <el-select
-            v-model="selectedCoursewareId"
-            class="courseware-select"
-            placeholder="请选择课件"
-            clearable
-            filterable
-            @change="syncCourseware"
-          >
-            <el-option
-              v-for="item in coursewares"
-              :key="item.id"
-              :label="`${item.title} · #${item.id}`"
-              :value="item.id"
-            />
-          </el-select>
-        </div>
-
         <div class="topbar-buttons">
           <div class="quick-links">
             <el-button plain @click="router.push('/dashboard/upload')">工作台</el-button>
@@ -62,6 +32,38 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
+        </div>
+
+        <div class="courseware-strip">
+          <div class="control-card">
+            <span class="control-label">切换课件</span>
+            <el-select
+              v-model="selectedCoursewareId"
+              class="courseware-select"
+              placeholder="请选择课件"
+              clearable
+              filterable
+              @change="syncCourseware"
+            >
+              <el-option
+                v-for="item in coursewares"
+                :key="item.id"
+                :label="`${item.title} · #${item.id}`"
+                :value="item.id"
+              />
+            </el-select>
+          </div>
+
+          <div class="topbar-meta">
+            <div class="meta-card">
+              <span>当前课件</span>
+              <strong>{{ currentCoursewareTitle }}</strong>
+            </div>
+            <div class="meta-card compact">
+              <span>课件总数</span>
+              <strong>{{ coursewares.length }}</strong>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -189,16 +191,18 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-shell {
   min-height: 100vh;
-  padding: 26px;
+  padding: 28px;
+  display: grid;
+  gap: 20px;
 }
 
 .dashboard-topbar {
   display: grid;
   grid-template-columns: minmax(0, 1.22fr) minmax(320px, 0.78fr);
-  gap: 22px;
-  margin-bottom: 22px;
+  gap: 24px;
   overflow: hidden;
   position: relative;
+  border-color: rgba(98, 115, 136, 0.2);
 }
 
 .dashboard-topbar::before {
@@ -206,8 +210,20 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at right top, rgba(245, 158, 11, 0.14), transparent 24%),
-    radial-gradient(circle at left center, rgba(56, 189, 248, 0.12), transparent 24%);
+    radial-gradient(circle at right top, rgba(201, 107, 44, 0.16), transparent 22%),
+    radial-gradient(circle at left center, rgba(56, 189, 248, 0.12), transparent 22%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 45%);
+  pointer-events: none;
+}
+
+.dashboard-topbar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
   pointer-events: none;
 }
 
@@ -219,38 +235,44 @@ onUnmounted(() => {
 
 .topbar-kicker {
   font-size: 12px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
+  font-weight: 700;
 }
 
 .topbar-title {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   font-size: clamp(34px, 5vw, 52px);
-  line-height: 0.98;
+  line-height: 0.94;
   letter-spacing: -0.04em;
+  max-width: 10.5em;
 }
 
 .topbar-subtitle {
-  margin: 14px 0 0;
+  margin: 16px 0 0;
   max-width: 720px;
   color: var(--muted);
   line-height: 1.85;
+  font-size: 14px;
 }
 
 .topbar-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 18px;
+  gap: 14px;
 }
 
 .meta-card {
-  padding: 14px 16px;
-  border-radius: 18px;
+  padding: 16px 18px;
+  border-radius: 20px;
   border: 1px solid rgba(122, 104, 86, 0.14);
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 248, 241, 0.62)),
+    rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 12px 24px rgba(17, 32, 49, 0.05);
 }
 
 .meta-card span {
@@ -258,24 +280,39 @@ onUnmounted(() => {
   margin-bottom: 8px;
   font-size: 12px;
   color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .meta-card strong {
   display: block;
   line-height: 1.55;
+  font-size: 18px;
 }
 
 .topbar-actions {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   align-content: start;
 }
 
+.courseware-strip {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
 .control-card {
-  padding: 16px;
+  display: grid;
+  align-content: start;
+  padding: 18px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.96));
+  background:
+    radial-gradient(circle at right top, rgba(22, 106, 109, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.96));
   border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .control-label {
@@ -283,8 +320,9 @@ onUnmounted(() => {
   margin-bottom: 10px;
   font-size: 12px;
   color: var(--muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-weight: 700;
 }
 
 .courseware-select {
@@ -294,7 +332,7 @@ onUnmounted(() => {
 .topbar-buttons {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -303,6 +341,10 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  padding: 8px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.42);
 }
 
 .user-center {
@@ -311,22 +353,32 @@ onUnmounted(() => {
   gap: 12px;
   padding: 10px 14px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.98));
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.98)),
+    rgba(255, 255, 255, 0.5);
   cursor: pointer;
+  box-shadow: 0 12px 22px rgba(17, 32, 49, 0.06);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.user-center:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201, 107, 44, 0.26);
+  box-shadow: 0 16px 28px rgba(17, 32, 49, 0.1);
 }
 
 .user-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   font-weight: 700;
-  background: linear-gradient(135deg, #f97316, #dc2626);
-  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.28);
+  background: linear-gradient(135deg, #dd7a30, #b94020);
+  box-shadow: 0 10px 24px rgba(217, 119, 6, 0.28);
 }
 
 .user-meta {
@@ -343,15 +395,19 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
+.dashboard-main {
+  position: relative;
+}
+
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: all 0.28s ease;
+  transition: all 0.32s ease;
 }
 
 .fade-slide-enter-from,
 .fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(12px) scale(0.995);
 }
 
 @media (max-width: 1080px) {
@@ -364,6 +420,10 @@ onUnmounted(() => {
   }
 
   .topbar-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .courseware-strip {
     grid-template-columns: 1fr;
   }
 }

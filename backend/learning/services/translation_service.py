@@ -260,16 +260,19 @@ class TranslationService:
     def _extract_and_translate_image_region_text(self, image_data_url: str, term_hint: str) -> tuple[str, str]:
         system_prompt = (
             "You are an OCR + translation assistant for course slides. "
-            "Extract visible text from the image region and translate between English and Simplified Chinese."
+            "Extract visible text from the image region and translate only meaningful English course content into Simplified Chinese."
         )
         user_text = (
             f"{term_hint}\n\n"
             "Requirements:\n"
             "1) Extract only visible text in the image region.\n"
-            "2) If source is mostly English, translate to Simplified Chinese; if source is mostly Chinese, translate to English.\n"
-            "3) Keep concise line structure when possible.\n"
-            '4) Return strict JSON only: {"source_text": "...", "translated_text": "..."}.\n'
-            "5) If no readable text, both fields should be empty string.\n"
+            "2) Translate to Simplified Chinese only when the extracted text is mainly English teaching or knowledge content.\n"
+            "3) If the region is a watermark, logo, icon, decorative image, chart/plot with no meaningful text to translate, "
+            "or text is already mostly Simplified Chinese, return empty strings for both fields.\n"
+            "4) Ignore pure numbers, axis ticks, isolated symbols, and non-knowledge fragments.\n"
+            "5) Keep concise line structure when possible.\n"
+            '6) Return strict JSON only: {"source_text": "...", "translated_text": "..."}.\n'
+            "7) If no readable text should be translated, both fields should be empty string.\n"
         )
         raw = self.client.chat(
             [
@@ -379,7 +382,7 @@ class TranslationService:
                     translated_text = str(cached_payload or "").strip()
 
             translated_text = str(translated_text or "").strip()
-            if not translated_text:
+            if not PPTParserService.should_keep_image_ocr_result(source_text, translated_text):
                 continue
             translated_map[container_id] = {
                 "text": translated_text,
@@ -645,7 +648,12 @@ class TranslationService:
             self._cache_container_results(chunk, chunk_map, term_hint)
         return translated_map
 
-    def _build_translated_layout(self, slide: SlideContent, term_hint: str) -> tuple[str, dict, str]:
+    def _build_translated_layout(
+        self,
+        slide: SlideContent,
+        term_hint: str,
+        repeated_short_phrase_fingerprints: set[str] | None = None,
+    ) -> tuple[str, dict, str]:
         source_layout = copy.deepcopy(slide.source_layout or {})
         source_containers = source_layout.get("text_containers", []) or []
         if not source_containers:
@@ -675,6 +683,11 @@ class TranslationService:
             is_pdf_source = False
         if is_pdf_source:
             source_containers = PPTParserService.dedupe_pdf_repeated_short_phrases(source_containers)
+        else:
+            source_containers = PPTParserService.filter_ppt_translation_containers(
+                source_containers,
+                repeated_short_phrase_fingerprints=repeated_short_phrase_fingerprints,
+            )
 
         text_containers = [item for item in source_containers if str(item.get("kind", "")) != "image_ocr"]
         image_containers = [item for item in source_containers if str(item.get("kind", "")) == "image_ocr"]
@@ -697,6 +710,8 @@ class TranslationService:
                     source_ocr_texts.append(source_ocr_text)
             translated_payload = translated_map.get(container_id, {})
             translated_text = str(translated_payload.get("text", "")).strip()
+            if not translated_text:
+                continue
             translated_paragraphs = self._split_to_match_paragraphs(
                 translated_text,
                 list(source_container.get("paragraphs", [])),
@@ -749,7 +764,15 @@ class TranslationService:
                 ]
             ).strip()
         else:
-            base_source_text = str(slide.source_text or "").strip()
+            base_source_text = "\n".join(
+                [
+                    str(container.get("text", "")).strip()
+                    for container in text_containers
+                    if str(container.get("text", "")).strip()
+                ]
+            ).strip()
+            if not base_source_text:
+                base_source_text = str(slide.source_text or "").strip()
         deduped_ocr: list[str] = []
         for item in source_ocr_texts:
             value = str(item or "").strip()
@@ -767,8 +790,17 @@ class TranslationService:
             enhanced_source_text = "\n\n".join([part for part in [base_source_text, ocr_block] if part]).strip()
         return "\n".join(translated_texts).strip(), translated_layout, enhanced_source_text
 
-    def _translate_single_slide(self, slide: SlideContent, term_hint: str) -> tuple[int, str, dict, str]:
-        translated_text, translated_layout, enhanced_source_text = self._build_translated_layout(slide, term_hint)
+    def _translate_single_slide(
+        self,
+        slide: SlideContent,
+        term_hint: str,
+        repeated_short_phrase_fingerprints: set[str] | None = None,
+    ) -> tuple[int, str, dict, str]:
+        translated_text, translated_layout, enhanced_source_text = self._build_translated_layout(
+            slide,
+            term_hint,
+            repeated_short_phrase_fingerprints=repeated_short_phrase_fingerprints,
+        )
         return slide.id, translated_text, translated_layout, enhanced_source_text
 
     @staticmethod
@@ -851,6 +883,7 @@ class TranslationService:
         failed_slides: list[tuple[int, Exception]] = []
         translated_count = 0
         started_at = courseware.translation_started_at
+        repeated_short_phrase_fingerprints: set[str] | None = None
 
         if not slides:
             courseware.status = Courseware.STATUS_TRANSLATED
@@ -863,11 +896,23 @@ class TranslationService:
             courseware.save(update_fields=["status", "last_error", "translation_duration_seconds", "updated_at"])
             return []
 
+        try:
+            if PPTParserService.is_ppt_file(courseware.file.path):
+                repeated_short_phrase_fingerprints = PPTParserService.collect_ppt_repeated_short_phrase_fingerprints(
+                    [slide.source_layout or {} for slide in slides]
+                )
+        except Exception:
+            repeated_short_phrase_fingerprints = None
+
         max_workers = min(self.max_workers, len(slides))
         if max_workers <= 1:
             for slide in slides:
                 try:
-                    _, translated_text, translated_layout, enhanced_source_text = self._translate_single_slide(slide, term_hint)
+                    _, translated_text, translated_layout, enhanced_source_text = self._translate_single_slide(
+                        slide,
+                        term_hint,
+                        repeated_short_phrase_fingerprints=repeated_short_phrase_fingerprints,
+                    )
                     if self._mark_slide_translation_result(slide, translated_text, translated_layout, enhanced_source_text):
                         translated_count += 1
                 except Exception as exc:
@@ -895,7 +940,14 @@ class TranslationService:
                         slide = next(pending_slides)
                     except StopIteration:
                         break
-                    future_map[executor.submit(self._translate_single_slide, slide, term_hint)] = slide
+                    future_map[
+                        executor.submit(
+                            self._translate_single_slide,
+                            slide,
+                            term_hint,
+                            repeated_short_phrase_fingerprints,
+                        )
+                    ] = slide
 
                 while future_map:
                     done, _ = wait(list(future_map.keys()), return_when=FIRST_COMPLETED)
@@ -930,7 +982,14 @@ class TranslationService:
                             next_slide = next(pending_slides)
                         except StopIteration:
                             continue
-                        future_map[executor.submit(self._translate_single_slide, next_slide, term_hint)] = next_slide
+                        future_map[
+                            executor.submit(
+                                self._translate_single_slide,
+                                next_slide,
+                                term_hint,
+                                repeated_short_phrase_fingerprints,
+                            )
+                        ] = next_slide
             finally:
                 executor.shutdown(wait=True, cancel_futures=True)
 
