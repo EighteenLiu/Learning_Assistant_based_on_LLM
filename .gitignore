@@ -43,3 +43,4 @@ debug-*.log
 thesis_inputs/
 thesis_outputs/
 tools/generated_figures/
+git status
