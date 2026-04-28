@@ -26,6 +26,9 @@ class PPTParserService:
     PDF_SHORT_PHRASE_MAX_LINES = 2
     PDF_SHORT_PHRASE_MAX_WORDS = 6
     PDF_SHORT_PHRASE_REPEAT_THRESHOLD = 3
+    PPT_WATERMARK_MIN_ROTATION = 20.0
+    PPT_WATERMARK_MAX_ROTATION = 70.0
+    PPT_MIN_TRANSLATABLE_LATIN_CHARS = 2
     SUPPORTED_FORMATS = (".pptx", ".ppt", ".pdf")
     PPT_FORMATS = (".pptx", ".ppt")
     PDF_FORMATS = (".pdf",)
@@ -42,6 +45,145 @@ class PPTParserService:
             return ""
         lines = [line.strip() for line in str(value).replace("\xa0", " ").splitlines()]
         return "\n".join([line for line in lines if line])
+
+    @staticmethod
+    def _flatten_text(value: str) -> str:
+        return re.sub(r"\s+", " ", PPTParserService._normalize_text(value)).strip()
+
+    @staticmethod
+    def _text_script_counts(value: str) -> dict[str, int]:
+        flattened = PPTParserService._flatten_text(value)
+        return {
+            "latin": sum(1 for char in flattened if char.isascii() and char.isalpha()),
+            "cjk": sum(1 for char in flattened if "\u4e00" <= char <= "\u9fff"),
+            "digits": sum(1 for char in flattened if char.isdigit()),
+        }
+
+    @staticmethod
+    def _has_translatable_latin_text(value: str) -> bool:
+        flattened = PPTParserService._flatten_text(value)
+        return bool(re.search(r"[A-Za-z]{2,}", flattened))
+
+    @staticmethod
+    def _is_mostly_cjk_text(value: str) -> bool:
+        counts = PPTParserService._text_script_counts(value)
+        return counts["cjk"] >= 2 and counts["cjk"] >= counts["latin"]
+
+    @staticmethod
+    def _is_numeric_or_symbolic_text(value: str) -> bool:
+        counts = PPTParserService._text_script_counts(value)
+        return counts["latin"] == 0 and counts["cjk"] == 0
+
+    @staticmethod
+    def _normalized_rotation(rotation_deg: object) -> float:
+        try:
+            rotation = abs(float(rotation_deg or 0.0)) % 360.0
+        except Exception:
+            return 0.0
+        return min(rotation, 360.0 - rotation)
+
+    @staticmethod
+    def _is_likely_rotated_watermark(container: dict) -> bool:
+        flattened = PPTParserService._flatten_text(str(container.get("text", "") or ""))
+        if not flattened or bool(container.get("is_title")):
+            return False
+        rotation = PPTParserService._normalized_rotation(container.get("rotation_deg"))
+        if rotation < PPTParserService.PPT_WATERMARK_MIN_ROTATION:
+            return False
+        if rotation > PPTParserService.PPT_WATERMARK_MAX_ROTATION:
+            return False
+        return PPTParserService._is_repeated_pdf_short_phrase(flattened)
+
+    @staticmethod
+    def should_translate_ppt_text_container(
+        container: dict,
+        repeated_short_phrase_fingerprints: set[str] | None = None,
+    ) -> bool:
+        if str(container.get("kind", "") or "") == "image_ocr":
+            return True
+
+        text = str(container.get("text", "") or "").strip()
+        if not text:
+            return False
+
+        if repeated_short_phrase_fingerprints:
+            fingerprint = PPTParserService._pdf_text_fingerprint(text)
+            if fingerprint and fingerprint in repeated_short_phrase_fingerprints:
+                return False
+
+        if PPTParserService._is_mostly_cjk_text(text):
+            return False
+        if PPTParserService._is_numeric_or_symbolic_text(text):
+            return False
+        if PPTParserService._is_likely_rotated_watermark(container):
+            return False
+        return PPTParserService._has_translatable_latin_text(text)
+
+    @staticmethod
+    def filter_ppt_translation_containers(
+        containers: list[dict],
+        repeated_short_phrase_fingerprints: set[str] | None = None,
+    ) -> list[dict]:
+        filtered: list[dict] = []
+        for container in containers:
+            if str(container.get("kind", "") or "") == "image_ocr":
+                filtered.append(dict(container))
+                continue
+            if PPTParserService.should_translate_ppt_text_container(
+                container,
+                repeated_short_phrase_fingerprints=repeated_short_phrase_fingerprints,
+            ):
+                filtered.append(dict(container))
+        return filtered
+
+    @staticmethod
+    def collect_ppt_repeated_short_phrase_fingerprints(slide_layouts: list[dict]) -> set[str]:
+        repeated_candidates: Counter[str] = Counter()
+        for layout in slide_layouts:
+            containers = layout.get("text_containers", []) if isinstance(layout, dict) else []
+            seen_on_slide: set[str] = set()
+            for container in containers if isinstance(containers, list) else []:
+                if str(container.get("kind", "") or "") == "image_ocr":
+                    continue
+                text = str(container.get("text", "") or "").strip()
+                if not PPTParserService._is_repeated_pdf_short_phrase(text):
+                    continue
+                fingerprint = PPTParserService._pdf_text_fingerprint(text)
+                if fingerprint:
+                    seen_on_slide.add(fingerprint)
+            for fingerprint in seen_on_slide:
+                repeated_candidates[fingerprint] += 1
+        return {
+            key
+            for key, count in repeated_candidates.items()
+            if count >= PPTParserService.PDF_SHORT_PHRASE_REPEAT_THRESHOLD
+        }
+
+    @staticmethod
+    def sanitize_ppt_source_layout(
+        source_layout: dict,
+        repeated_short_phrase_fingerprints: set[str] | None = None,
+    ) -> tuple[str, str, dict]:
+        slide_width = int(source_layout.get("page_width", 1) or 1)
+        slide_height = int(source_layout.get("page_height", 1) or 1)
+        containers = source_layout.get("text_containers", []) or []
+        filtered_containers = PPTParserService.filter_ppt_translation_containers(
+            containers,
+            repeated_short_phrase_fingerprints=repeated_short_phrase_fingerprints,
+        )
+        return PPTParserService._finalize_layout(filtered_containers, slide_width, slide_height)
+
+    @staticmethod
+    def should_keep_image_ocr_result(source_text: str, translated_text: str) -> bool:
+        normalized_source = PPTParserService._normalize_text(source_text)
+        normalized_translated = PPTParserService._normalize_text(translated_text)
+        if not normalized_source or not normalized_translated:
+            return False
+        if PPTParserService._is_mostly_cjk_text(normalized_source):
+            return False
+        if PPTParserService._is_numeric_or_symbolic_text(normalized_source):
+            return False
+        return PPTParserService._has_translatable_latin_text(normalized_source)
 
     @staticmethod
     def _normalize_paragraph_text(paragraph) -> str:
@@ -138,6 +280,7 @@ class PPTParserService:
         row_index: int | None = None,
         col_index: int | None = None,
         allow_empty_text: bool = False,
+        rotation_deg: float = 0.0,
     ) -> None:
         normalized_text = PPTParserService._normalize_text(text)
         if not normalized_text and not allow_empty_text:
@@ -160,6 +303,7 @@ class PPTParserService:
                 "priority": priority,
                 "row_index": row_index,
                 "col_index": col_index,
+                "rotation_deg": float(rotation_deg or 0.0),
             }
         )
 
@@ -189,6 +333,7 @@ class PPTParserService:
             priority=80,
             is_title=False,
             allow_empty_text=True,
+            rotation_deg=float(getattr(shape, "rotation", 0.0) or 0.0),
         )
         return containers
 
@@ -277,6 +422,7 @@ class PPTParserService:
             slide_height=slide_height,
             priority=PPTParserService._shape_placeholder_priority(shape),
             is_title=PPTParserService._is_title_shape(shape),
+            rotation_deg=float(getattr(shape, "rotation", 0.0) or 0.0),
         )
         if containers:
             containers[-1]["font_name"] = font_name
@@ -321,6 +467,7 @@ class PPTParserService:
                     is_title=False,
                     row_index=row_index,
                     col_index=col_index,
+                    rotation_deg=float(getattr(shape, "rotation", 0.0) or 0.0),
                 )
                 if containers:
                     font_name, font_size_pt = PPTParserService._extract_font_profile(cell.text_frame)
@@ -833,6 +980,18 @@ class PPTParserService:
                         source_layout=source_layout,
                     )
                 )
+
+            repeated_short_phrase_fingerprints = PPTParserService.collect_ppt_repeated_short_phrase_fingerprints(
+                [slide.source_layout for slide in parsed]
+            )
+            for slide in parsed:
+                title, source_text, source_layout = PPTParserService.sanitize_ppt_source_layout(
+                    slide.source_layout,
+                    repeated_short_phrase_fingerprints=repeated_short_phrase_fingerprints,
+                )
+                slide.title = title
+                slide.source_text = source_text
+                slide.source_layout = source_layout
 
             if temp_pptx:
                 try:
