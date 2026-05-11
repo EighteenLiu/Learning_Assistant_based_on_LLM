@@ -23,6 +23,9 @@ class Courseware(models.Model):
     last_error = models.TextField(blank=True, default="")
     translation_started_at = models.DateTimeField(null=True, blank=True)
     translation_duration_seconds = models.PositiveIntegerField(null=True, blank=True)
+    translation_total_chunks = models.PositiveIntegerField(default=0)
+    translation_completed_chunks = models.PositiveIntegerField(default=0)
+    translation_current_slide_no = models.PositiveIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -74,6 +77,7 @@ class SummaryRecord(models.Model):
     chapter_summary = models.TextField()
     key_points = models.JSONField(default=list, blank=True)
     term_pairs = models.JSONField(default=list, blank=True)
+    learning_suggestions = models.JSONField(default=list, blank=True)
     mind_map = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

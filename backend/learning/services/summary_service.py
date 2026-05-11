@@ -47,7 +47,7 @@ class SummaryService:
         children = node.get("children", [])
         normalized_children = []
         if isinstance(children, list):
-            for child in children[:8]:
+            for child in children[:12]:
                 normalized_children.append(SummaryService._normalize_mind_map(child, "主题"))
         return {"title": title, "children": normalized_children}
 
@@ -63,12 +63,12 @@ class SummaryService:
         normalized: list[str] = []
         seen: set[str] = set()
         for item in values:
-            text = str(item or "").strip()
+            text = re.sub(r"\s+", " ", str(item or "")).strip()
             if not text or text in seen:
                 continue
             seen.add(text)
             normalized.append(text)
-            if len(normalized) >= 5:
+            if len(normalized) >= 6:
                 break
         return normalized
 
@@ -80,38 +80,86 @@ class SummaryService:
     ) -> list[str]:
         key_points = key_points or []
         term_pairs = term_pairs or []
-
-        suggestions: list[str] = [
-            "先把本章当作“系统设计问题”而不是“知识点列表”：核心不是记住步骤，而是识别每一步在防什么风险、约束什么行为、留下什么证据。",
-            "从“规则”升级到“机制”理解：对每个关键结论都追问一次“如果去掉这条规则，系统最先失效在哪里”，你会看到知识背后的因果结构。",
-            "把学习目标从“会复述”改成“会裁决”：给自己一个模糊案例，尝试在多种可行方案中做取舍并说明代价，这一步最能逼出真正理解。",
-            "建立迁移能力：把本章方法套到另一个你熟悉的场景，检验哪些原则仍成立、哪些会失效；能迁移，才算掌握了抽象层能力。",
-        ]
-
+        clean_points = [str(item or "").strip() for item in key_points if str(item or "").strip()]
         terms = [
             str(item.get("en", "")).strip()
             for item in term_pairs
             if isinstance(item, dict) and str(item.get("en", "")).strip()
         ]
+
+        anchor = SummaryService._compact_text(chapter_summary, 54) if chapter_summary else "本课件核心内容"
+        focus = SummaryService._compact_text(clean_points[0], 42) if clean_points else anchor
+        suggestions: list[str] = [
+            f"先用一句话回答“这节课到底想解决什么问题”：围绕“{focus}”写出问题、约束和结论，避免只背零散概念。",
+            "学习时按“背景动机-核心机制-关键证据-应用边界”四栏整理笔记，每一栏只保留能解释因果关系的内容。",
+            "做一次反向检查：假设某个关键条件不成立，推演结论会在哪一步失效，这能帮助你真正理解方法边界。",
+        ]
+
         if terms:
             sampled_terms = "、".join(terms[:3])
             suggestions.append(
-                f"把术语 {sampled_terms} 放进同一个“概念关系图”：标出它们的前置条件、边界和冲突点，重点不是定义本身，而是它们如何共同决定决策质量。"
+                f"把术语 {sampled_terms} 放进同一张关系图，标出它们分别回答“是什么、为什么、怎么用、何时失效”。"
             )
         else:
-            point_count = max(len([item for item in key_points if str(item).strip()]), 1)
+            point_count = max(len(clean_points), 1)
             suggestions.append(
-                f"围绕这 {point_count} 个关键点做一次“反例推演”：每个点都构造一个失败场景，写清楚失败触发条件和修正策略。"
+                f"围绕 {point_count} 个关键点各设计一个自测问题，答案必须包含“现象、原因、适用条件、一个例子”。"
             )
 
-        summary_text = str(chapter_summary or "").strip()
-        if summary_text:
-            anchor = SummaryService._compact_text(summary_text, 36)
-            suggestions.append(
-                f"从摘要中的“{anchor}”抽出一句可执行判断准则，作为你后续做题或做项目时的决策锚点。"
-            )
-
+        suggestions.append(f"复盘时不要重读全文，直接根据摘要“{anchor}”画出三条因果链，再回到课件查漏补缺。")
         return SummaryService._normalize_suggestions(suggestions)
+
+    def generate_learning_suggestions(
+        self,
+        chapter_summary: str,
+        key_points: list[str] | None = None,
+        term_pairs: list[dict] | None = None,
+        mind_map: dict | None = None,
+        courseware_title: str = "",
+    ) -> list[str]:
+        fallback = self.build_learning_suggestions(chapter_summary, key_points, term_pairs)
+        payload = {
+            "courseware_title": courseware_title,
+            "chapter_summary": SummaryService._compact_text(chapter_summary, 1200),
+            "key_points": (key_points or [])[:10],
+            "term_pairs": (term_pairs or [])[:12],
+            "mind_map": mind_map or {},
+        }
+        system_prompt = (
+            "You are a senior bilingual course learning coach. "
+            "Return strict JSON only. Do not include markdown."
+        )
+        user_prompt = (
+            "基于下面的课件总结，为学生生成深入浅出的学习建议。\n"
+            "输出格式必须是：{\"learning_suggestions\": [\"建议1\", \"建议2\"]}\n"
+            "要求：\n"
+            "1) 生成 5 条中文建议，每条 55-110 字。\n"
+            "2) 每条都要包含具体做法，而不是空泛鼓励。\n"
+            "3) 建议要围绕本课件内容，体现“为什么这样学、怎么操作、如何自检”。\n"
+            "4) 避免套话，如认真学习、加强理解、做好笔记。\n"
+            "5) 语言要像助教给学生的建议，深入但容易懂。\n\n"
+            f"课件信息：\n{json.dumps(payload, ensure_ascii=False)}"
+        )
+        try:
+            raw = self.client.chat(
+                [ChatMessage(role="system", content=system_prompt), ChatMessage(role="user", content=user_prompt)],
+                temperature=0.35,
+            )
+            parsed = json.loads(self._extract_json_payload(raw))
+            suggestions = parsed.get("learning_suggestions", [])
+            if isinstance(suggestions, list):
+                normalized = self._normalize_suggestions([str(item) for item in suggestions])
+                if normalized:
+                    return normalized
+        except Exception as exc:
+            debug_log(
+                hypothesisId="H18",
+                runId="pre-diagnose",
+                location="summary_service:generate_learning_suggestions",
+                message="LLM learning suggestions failed, using local fallback",
+                data={"exc_type": type(exc).__name__, "error": str(exc)[:500]},
+            )
+        return fallback
 
     @staticmethod
     def _build_local_fallback(courseware: Courseware, slides: list, reason: str = "") -> tuple[str, list[str], list[dict], dict]:
@@ -157,7 +205,8 @@ class SummaryService:
 
         system_prompt = (
             "You are a bilingual course summarization assistant. "
-            "Return strict JSON with keys chapter_summary, key_points, term_pairs, mind_map."
+            "Return strict JSON with keys chapter_summary, key_points, term_pairs, mind_map. "
+            "Build the mind_map as a conceptual knowledge map, not a slide-by-slide outline."
         )
         user_prompt = (
             "Please summarize the following courseware content.\n"
@@ -174,9 +223,11 @@ class SummaryService:
             "  }\n"
             "}\n\n"
             "Mind map requirements:\n"
-            "1) Root title should describe the whole courseware.\n"
-            "2) Keep tree depth within 3 levels.\n"
-            "3) Each node should be concise.\n\n"
+            "1) Root title should describe the whole courseware in Chinese.\n"
+            "2) First-level nodes should be conceptual clusters such as background, core mechanism, method workflow, evidence, limitations, and application. Do not use page numbers as first-level nodes.\n"
+            "3) Second-level nodes should explain relationships, causes, constraints, comparisons, or use cases rather than copying long source sentences.\n"
+            "4) Keep tree depth within 3 levels, first-level node count within 4-8, and each node within 18 Chinese characters when possible.\n"
+            "5) Prefer Chinese node titles. Keep English terms only when they are necessary technical terms.\n\n"
             f"Course content:\n{content[:20000]}"
         )
 

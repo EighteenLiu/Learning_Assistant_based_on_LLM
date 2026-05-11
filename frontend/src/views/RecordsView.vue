@@ -297,9 +297,7 @@
             </div>
           </div>
           <div class="mind-map-shell">
-            <ul class="mind-map-root">
-              <MindMapNode :node="latestSummary.mind_map" />
-            </ul>
+            <MindMapNode :node="latestSummary.mind_map" />
           </div>
         </section>
       </main>
@@ -824,8 +822,8 @@ onUnmounted(() => {
   left: 0;
   z-index: 30;
   width: min(320px, calc(100vw - 28px));
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   max-height: calc(100vh - 120px);
   overflow: hidden;
@@ -893,9 +891,13 @@ onUnmounted(() => {
 
 .sidebar-list {
   display: grid;
+  align-content: start;
   gap: 12px;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  overscroll-behavior: contain;
+  padding: 0 4px 4px 0;
+  scrollbar-gutter: stable;
 }
 
 .courseware-item {
@@ -1454,14 +1456,6 @@ onUnmounted(() => {
     linear-gradient(180deg, rgba(255, 252, 247, 0.9), rgba(250, 246, 240, 0.96));
 }
 
-.mind-map-root {
-  display: flex;
-  justify-content: center;
-  min-width: fit-content;
-  margin: 0;
-  padding: 0 10px;
-}
-
 @media (max-width: 1180px) {
   .records-content-grid,
   .compare-grid,
@@ -1473,7 +1467,7 @@ onUnmounted(() => {
     top: 8px;
     left: 8px;
     width: min(320px, calc(100vw - 16px));
-    max-height: none;
+    max-height: calc(100vh - 24px);
   }
 }
 

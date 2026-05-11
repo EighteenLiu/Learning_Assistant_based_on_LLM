@@ -7,6 +7,9 @@ export interface CoursewareItem {
   total_slides?: number;
   translated_slides?: number;
   rendered_slides?: number;
+  translation_total_chunks?: number;
+  translation_completed_chunks?: number;
+  translation_current_slide_no?: number | null;
   translation_duration_seconds?: number | null;
 }
 

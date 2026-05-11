@@ -114,4 +114,4 @@ class QARecordSerializer(serializers.ModelSerializer):
 class SummaryRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = SummaryRecord
-        fields = ("id", "chapter_summary", "key_points", "term_pairs", "mind_map", "created_at")
+        fields = ("id", "chapter_summary", "key_points", "term_pairs", "learning_suggestions", "mind_map", "created_at")

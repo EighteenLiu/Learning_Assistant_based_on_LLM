@@ -57,6 +57,9 @@
             <strong>{{ translationProgress.translated }} / {{ translationProgress.total || slides.length || "-" }}</strong>
           </div>
           <div class="status-item">
+            <span>分块进度</span>
+          </div>
+          <div class="status-item">
             <span>预估剩余时间</span>
             <strong>{{ estimatedTimeRemaining }}</strong>
           </div>
@@ -127,15 +130,6 @@
             <div class="preview-title">中文翻译页</div>
             <div class="slide-canvas translated-stage" :style="canvasStyle(currentSlide.translated_layout, currentSlide.translated_text)">
               <img v-if="translatedPreviewUrl" class="slide-image" :src="translatedPreviewUrl" alt="中文翻译页" />
-              <div
-                v-if="translatedPreviewUrl"
-                v-for="block in imageOcrBlocks"
-                :key="`img-ocr-${currentSlide.slide_no}-${block.block_id}`"
-                class="slide-block image-ocr-overlay"
-                :style="blockStyle(block)"
-              >
-                {{ block.text }}
-              </div>
               <template v-else>
                 <div class="translated-background"></div>
                 <div
@@ -288,9 +282,7 @@
           <div class="card-kicker">Mind Map</div>
           <h4>课程思维导图</h4>
           <div class="mind-map-shell">
-            <ul class="mind-map-root">
-              <MindMapNode :node="summary.mind_map" />
-            </ul>
+            <MindMapNode :node="summary.mind_map" />
           </div>
         </section>
       </div>
@@ -356,8 +348,17 @@ const selectedCoursewareTitle = ref("");
 const coursewareStatus = ref<CoursewareItem["status"] | "idle">("idle");
 const lastErrorMessage = ref("");
 const updatedAt = ref<string>("");
-const translationProgress = ref({ total: 0, translated: 0, rendered: 0 });
+const translationProgress = ref({
+  total: 0,
+  translated: 0,
+  rendered: 0,
+  totalChunks: 0,
+  completedChunks: 0,
+  currentSlideNo: null as number | null,
+});
 const translationStartedAt = ref<number | null>(null);
+const translationElapsedSeconds = ref<number | null>(null);
+const smoothedEtaSeconds = ref<number | null>(null);
 const question = ref("");
 const useGlobalScope = ref(true);
 const showTranslatedNotes = ref(false);
@@ -399,11 +400,94 @@ const translatedBlocks = computed(() => {
   ].filter((item) => item.text);
 });
 
-const imageOcrBlocks = computed(() =>
-  translatedBlocks.value.filter((block) => block.kind === "image_ocr" && String(block.text || "").trim())
-);
-
 const processedSlides = computed(() => Math.max(Number(translationProgress.value.translated || 0), 0));
+
+const resolveTranslationElapsedSeconds = () => {
+  if (typeof translationElapsedSeconds.value === "number" && Number.isFinite(translationElapsedSeconds.value)) {
+    return Math.max(translationElapsedSeconds.value, 0);
+  }
+  if (translationStartedAt.value) {
+    return Math.max((Date.now() - translationStartedAt.value) / 1000, 0);
+  }
+  return 0;
+};
+
+const updateEstimatedRemainingSeconds = () => {
+  if (coursewareStatus.value !== "translating") {
+    smoothedEtaSeconds.value = null;
+    return;
+  }
+
+  const totalSlides = Math.max(Number(translationProgress.value.total || slides.value.length || 0), 0);
+  const translatedSlides = Math.max(Number(translationProgress.value.translated || 0), 0);
+  const totalChunks = Math.max(Number(translationProgress.value.totalChunks || 0), 0);
+  const completedChunks = Math.max(Number(translationProgress.value.completedChunks || 0), 0);
+  const elapsedSeconds = Math.max(resolveTranslationElapsedSeconds(), 1);
+  const pendingSlides = Math.max(totalSlides - translatedSlides, 0);
+
+  if (pendingSlides <= 0) {
+    smoothedEtaSeconds.value = 0;
+    return;
+  }
+
+  let slideEta: number | null = null;
+  if (translatedSlides >= 1) {
+    slideEta = (elapsedSeconds / translatedSlides) * pendingSlides;
+  }
+
+  let chunkEta: number | null = null;
+  if (totalChunks > 0 && completedChunks >= 2 && completedChunks < totalChunks) {
+    chunkEta = (elapsedSeconds / completedChunks) * (totalChunks - completedChunks);
+  }
+
+  let nextEta: number | null = null;
+  if (slideEta != null && chunkEta != null) {
+    const slideWeight = Math.min(Math.max(translatedSlides / Math.max(totalSlides, 1), 0.35), 0.85);
+    nextEta = slideEta * slideWeight + chunkEta * (1 - slideWeight);
+  } else if (slideEta != null) {
+    nextEta = slideEta;
+  } else if (chunkEta != null) {
+    nextEta = chunkEta;
+  }
+
+  if (nextEta == null || !Number.isFinite(nextEta)) {
+    smoothedEtaSeconds.value = null;
+    return;
+  }
+
+  const boundedEta = Math.max(nextEta, 0);
+  if (smoothedEtaSeconds.value == null || translatedSlides <= 0) {
+    smoothedEtaSeconds.value = boundedEta;
+    return;
+  }
+
+  const progressRatio = totalSlides > 0 ? translatedSlides / totalSlides : 0;
+  const smoothingFactor = progressRatio >= 0.5 ? 0.45 : 0.3;
+  smoothedEtaSeconds.value = smoothedEtaSeconds.value * (1 - smoothingFactor) + boundedEta * smoothingFactor;
+};
+const processedUnits = computed(() => {
+  const totalChunks = Number(translationProgress.value.totalChunks || 0);
+  if (totalChunks > 0) {
+    return {
+      done: Math.max(Number(translationProgress.value.completedChunks || 0), 0),
+      total: totalChunks,
+    };
+  }
+  return {
+    done: processedSlides.value,
+    total: Number(translationProgress.value.total || 0),
+  };
+});
+const chunkProgressLabel = computed(() => {
+  const totalChunks = Number(translationProgress.value.totalChunks || 0);
+  if (totalChunks <= 0) {
+    return coursewareStatus.value === "translating" ? "准备分块中" : "-";
+  }
+  const currentSlide = translationProgress.value.currentSlideNo
+    ? `（第 ${translationProgress.value.currentSlideNo} 页）`
+    : "";
+  return `${Number(translationProgress.value.completedChunks || 0)} / ${totalChunks}${currentSlide}`;
+});
 
 const formatDuration = (totalSeconds: number) => {
   const sec = Math.max(Math.floor(totalSeconds), 0);
@@ -419,15 +503,14 @@ const estimatedTimeRemaining = computed(() => {
   if (coursewareStatus.value !== "translating") {
     return "-";
   }
-  if (!translationStartedAt.value) {
+  if (smoothedEtaSeconds.value == null) {
     return "估算中";
   }
-  const done = processedSlides.value;
-  const total = Number(translationProgress.value.total || 0);
-  const pending = Math.max(total - done, 0);
-  if (pending <= 0) {
+  if (smoothedEtaSeconds.value <= 3) {
     return "即将完成";
   }
+  return formatDuration(smoothedEtaSeconds.value);
+/*
   if (done <= 0) {
     return "估算中";
   }
@@ -437,7 +520,14 @@ const estimatedTimeRemaining = computed(() => {
     return "估算中";
   }
   return formatDuration(pending / speed);
+*/
 });
+
+const resetTranslationTiming = () => {
+  translationStartedAt.value = null;
+  translationElapsedSeconds.value = null;
+  smoothedEtaSeconds.value = null;
+};
 
 const statusLabel = computed(() => {
   const statusMap: Record<string, string> = {
@@ -597,7 +687,12 @@ const refreshCoursewareStatus = async (coursewareId: number) => {
     const { data } = await http.get(`/coursewares/${coursewareId}/status`);
     coursewareStatus.value = data.status;
     if (data.status !== "translating") {
-      translationStartedAt.value = null;
+      resetTranslationTiming();
+    } else {
+      const backendElapsed = Number(data?.translation_duration_seconds);
+      translationElapsedSeconds.value = Number.isFinite(backendElapsed)
+        ? Math.max(backendElapsed, 0)
+        : resolveTranslationElapsedSeconds();
     }
     selectedCoursewareTitle.value = data.title || "";
     lastErrorMessage.value = data.last_error || "";
@@ -606,11 +701,15 @@ const refreshCoursewareStatus = async (coursewareId: number) => {
       total: Number(data?.total_slides ?? slides.value.length ?? 0),
       translated: Number(data?.translated_slides ?? 0),
       rendered: Number(data?.rendered_slides ?? 0),
+      totalChunks: Number(data?.translation_total_chunks ?? 0),
+      completedChunks: Number(data?.translation_completed_chunks ?? 0),
+      currentSlideNo: data?.translation_current_slide_no ?? null,
     };
+    updateEstimatedRemainingSeconds();
     return data;
   } catch {
     coursewareStatus.value = "idle";
-    translationStartedAt.value = null;
+    resetTranslationTiming();
     selectedCoursewareTitle.value = "";
     lastErrorMessage.value = "";
     updatedAt.value = "";
@@ -618,7 +717,11 @@ const refreshCoursewareStatus = async (coursewareId: number) => {
       total: slides.value.length,
       translated: 0,
       rendered: 0,
+      totalChunks: 0,
+      completedChunks: 0,
+      currentSlideNo: null,
     };
+    updateEstimatedRemainingSeconds();
     return null;
   }
 };
@@ -664,7 +767,7 @@ const hydrateCurrentCourseware = async () => {
   if (!selectedCoursewareId.value) {
     slides.value = [];
     coursewareStatus.value = "idle";
-    translationStartedAt.value = null;
+    resetTranslationTiming();
     selectedCoursewareTitle.value = "";
     lastErrorMessage.value = "";
     updatedAt.value = "";
@@ -751,10 +854,18 @@ const uploadFile = async () => {
     selectedCoursewareId.value = data.courseware_id;
     selectedCoursewareTitle.value = data.title || "";
     coursewareStatus.value = "uploaded";
-    translationStartedAt.value = null;
+    resetTranslationTiming();
     lastErrorMessage.value = "";
     updatedAt.value = new Date().toISOString();
-    translationProgress.value = { total: Number(data.slide_count || 0), translated: 0, rendered: 0 };
+    translationProgress.value = {
+      total: Number(data.slide_count || 0),
+      translated: 0,
+      rendered: 0,
+      totalChunks: 0,
+      completedChunks: 0,
+      currentSlideNo: null,
+    };
+    updateEstimatedRemainingSeconds();
     resetLearningPanels();
     await loadSlides(data.courseware_id);
     emit("courseware-updated");
@@ -778,6 +889,9 @@ const translateCurrent = async () => {
   coursewareStatus.value = "translating";
   lastErrorMessage.value = "";
   translationStartedAt.value = Date.now();
+  translationElapsedSeconds.value = 0;
+  smoothedEtaSeconds.value = null;
+  updateEstimatedRemainingSeconds();
 
   try {
     const forceSuffix = coursewareStatus.value === "translated" ? "?force=1" : "";
@@ -808,14 +922,14 @@ const translateCurrent = async () => {
 
       if (currentStatus === "translated") {
         await loadSlides(selected);
-        translationStartedAt.value = null;
+        resetTranslationTiming();
         emit("courseware-updated");
         ElMessage.success("翻译完成，预览内容已刷新");
         return;
       }
 
       if (currentStatus === "failed") {
-        translationStartedAt.value = null;
+        resetTranslationTiming();
         const failedReason = String(statusData?.last_error || "").trim();
         throw new Error(failedReason || "翻译任务失败");
       }
@@ -1215,6 +1329,10 @@ onUnmounted(() => {
   text-align: left;
   font-size: 17px;
   line-height: 1.45;
+}
+
+.status-item:has(> span:only-child) {
+  display: none;
 }
 
 .status-note {
@@ -1649,14 +1767,6 @@ onUnmounted(() => {
 .mind-map-shell {
   overflow-x: auto;
   padding: 12px 0 4px;
-}
-
-.mind-map-root {
-  display: flex;
-  justify-content: center;
-  min-width: fit-content;
-  margin: 0;
-  padding: 0 8px;
 }
 
 @media (max-width: 1080px) {

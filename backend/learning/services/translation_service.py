@@ -6,11 +6,13 @@ import hashlib
 import io
 import json
 import re
+import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 
 from django.conf import settings
 from django.db import DatabaseError
+from django.db.models import F
 from django.utils import timezone
 from PIL import Image
 
@@ -43,6 +45,7 @@ class TranslationService:
             int(getattr(settings, "TRANSLATION_CHUNK_MAX_CHARS", 7000) or 200),
             200,
         )
+        self.chunk_max_retries = max(int(getattr(settings, "TRANSLATION_CHUNK_MAX_RETRIES", 2) or 1), 1)
         self.image_ocr_enabled = bool(getattr(settings, "TRANSLATION_IMAGE_OCR_ENABLED", True))
         self.image_ocr_max_containers_per_slide = max(
             int(getattr(settings, "TRANSLATION_IMAGE_OCR_MAX_CONTAINERS_PER_SLIDE", 3) or 1),
@@ -266,7 +269,7 @@ class TranslationService:
             f"{term_hint}\n\n"
             "Requirements:\n"
             "1) Extract only visible text in the image region.\n"
-            "2) Translate to Simplified Chinese only when the extracted text is mainly English teaching or knowledge content.\n"
+            "2) If the region contains three or more English words, translate the meaningful English content into Simplified Chinese even when it is mixed with numbers, symbols, formulas, or imperfect OCR fragments.\n"
             "3) If the region is a watermark, logo, icon, decorative image, chart/plot with no meaningful text to translate, "
             "or text is already mostly Simplified Chinese, return empty strings for both fields.\n"
             "4) Ignore pure numbers, axis ticks, isolated symbols, and non-knowledge fragments.\n"
@@ -333,7 +336,7 @@ class TranslationService:
                 continue
             image_data_url, image_digest = payload
             source_token = (
-                f"imgocr:v2:{slide.id}:{container_id}:{image_digest}:"
+                f"imgocr:v3:{slide.id}:{container_id}:{image_digest}:"
                 f"{round(float(container.get('x', 0) or 0), 4)}:"
                 f"{round(float(container.get('y', 0) or 0), 4)}:"
                 f"{round(float(container.get('w', 0) or 0), 4)}:"
@@ -618,7 +621,161 @@ class TranslationService:
             }
         return translated_map
 
-    def _translate_containers(self, containers: list[dict], term_hint: str) -> dict[int, dict]:
+    def _translate_container_chunk_with_retries(
+        self,
+        payload_containers: list[dict],
+        term_hint: str,
+        slide: SlideContent | None = None,
+    ) -> dict[int, dict]:
+        last_exc: Exception | None = None
+        for attempt in range(1, self.chunk_max_retries + 1):
+            try:
+                return self._translate_container_chunk(payload_containers, term_hint)
+            except Exception as exc:
+                last_exc = exc
+                debug_log(
+                    hypothesisId="H18",
+                    runId="pre-diagnose",
+                    location="translation_service:_translate_container_chunk_with_retries",
+                    message="Container chunk translation failed, retrying" if attempt < self.chunk_max_retries else "Container chunk translation failed finally",
+                    data={
+                        "courseware_id": getattr(getattr(slide, "courseware", None), "id", None),
+                        "slide_no": getattr(slide, "slide_no", None),
+                        "attempt": attempt,
+                        "max_retries": self.chunk_max_retries,
+                        "container_count": len(payload_containers),
+                        "char_count": sum(len(str(item.get("text", ""))) for item in payload_containers),
+                        "exc_type": type(exc).__name__,
+                        "error": self._sanitize_error_text(exc),
+                    },
+                )
+                if attempt < self.chunk_max_retries:
+                    time.sleep(min(0.5 * attempt, 2.0))
+        if last_exc is not None:
+            raise last_exc
+        return {}
+
+    def _split_long_text_for_translation(self, text: str) -> list[str]:
+        normalized = str(text or "").strip()
+        if not normalized:
+            return []
+        max_chars = max(self.chunk_max_chars, 200)
+        paragraphs = [part.strip() for part in re.split(r"\n{2,}", normalized) if part.strip()]
+        if not paragraphs:
+            paragraphs = [line.strip() for line in normalized.splitlines() if line.strip()] or [normalized]
+
+        chunks: list[str] = []
+        current: list[str] = []
+        current_len = 0
+        for paragraph in paragraphs:
+            if len(paragraph) > max_chars:
+                if current:
+                    chunks.append("\n\n".join(current).strip())
+                    current = []
+                    current_len = 0
+                for start in range(0, len(paragraph), max_chars):
+                    part = paragraph[start : start + max_chars].strip()
+                    if part:
+                        chunks.append(part)
+                continue
+
+            next_len = current_len + len(paragraph) + (2 if current else 0)
+            if current and next_len > max_chars:
+                chunks.append("\n\n".join(current).strip())
+                current = [paragraph]
+                current_len = len(paragraph)
+            else:
+                current.append(paragraph)
+                current_len = next_len
+        if current:
+            chunks.append("\n\n".join(current).strip())
+        return [chunk for chunk in chunks if chunk]
+
+    def _translate_long_container_text(
+        self,
+        container: dict,
+        term_hint: str,
+        slide: SlideContent | None = None,
+    ) -> dict:
+        source_text = str(container.get("text", "")).strip()
+        chunks = self._split_long_text_for_translation(source_text)
+        if not chunks:
+            return {"text": "", "paragraphs": []}
+
+        courseware_id = getattr(getattr(slide, "courseware", None), "id", None)
+        slide_no = getattr(slide, "slide_no", None)
+        self._add_translation_chunks(courseware_id, len(chunks), slide_no)
+
+        translated_parts: list[str] = []
+        for chunk in chunks:
+            last_exc: Exception | None = None
+            translated = ""
+            for attempt in range(1, self.chunk_max_retries + 1):
+                try:
+                    translated = self._translate_text(
+                        chunk,
+                        term_hint,
+                        translation_type=self.CACHE_TYPE_CONTAINER,
+                    )
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    debug_log(
+                        hypothesisId="H19",
+                        runId="pre-diagnose",
+                        location="translation_service:_translate_long_container_text",
+                        message="Long container sub-chunk failed, retrying" if attempt < self.chunk_max_retries else "Long container sub-chunk failed finally",
+                        data={
+                            "courseware_id": courseware_id,
+                            "slide_no": slide_no,
+                            "attempt": attempt,
+                            "max_retries": self.chunk_max_retries,
+                            "char_count": len(chunk),
+                            "exc_type": type(exc).__name__,
+                            "error": self._sanitize_error_text(exc),
+                        },
+                    )
+                    if attempt < self.chunk_max_retries:
+                        time.sleep(min(0.5 * attempt, 2.0))
+            if not translated and last_exc is not None:
+                raise last_exc
+            translated_parts.append(translated)
+            self._mark_translation_chunk_done(courseware_id, slide_no)
+
+        translated_text = "\n\n".join(part for part in translated_parts if str(part).strip()).strip()
+        return {
+            "text": translated_text,
+            "paragraphs": self._split_to_match_paragraphs(
+                translated_text,
+                list(container.get("paragraphs", [])),
+            ),
+        }
+
+    @staticmethod
+    def _add_translation_chunks(courseware_id: int | None, chunk_count: int, slide_no: int | None = None) -> None:
+        if not courseware_id or chunk_count <= 0:
+            return
+        update_fields = {"translation_total_chunks": F("translation_total_chunks") + chunk_count}
+        if slide_no:
+            update_fields["translation_current_slide_no"] = slide_no
+        try:
+            Courseware.objects.filter(id=courseware_id).update(**update_fields)
+        except DatabaseError:
+            return
+
+    @staticmethod
+    def _mark_translation_chunk_done(courseware_id: int | None, slide_no: int | None = None) -> None:
+        if not courseware_id:
+            return
+        update_fields = {"translation_completed_chunks": F("translation_completed_chunks") + 1}
+        if slide_no:
+            update_fields["translation_current_slide_no"] = slide_no
+        try:
+            Courseware.objects.filter(id=courseware_id).update(**update_fields)
+        except DatabaseError:
+            return
+
+    def _translate_containers(self, containers: list[dict], term_hint: str, slide: SlideContent | None = None) -> dict[int, dict]:
         payload_containers = []
         for container in containers:
             source_text = str(container.get("text", "")).strip()
@@ -641,11 +798,31 @@ class TranslationService:
         if not pending_containers:
             return translated_map
 
-        chunks = self._chunk_payload_containers(pending_containers)
+        normal_pending: list[dict] = []
+        long_pending: list[dict] = []
+        for container in pending_containers:
+            if len(str(container.get("text", "") or "")) > self.chunk_max_chars:
+                long_pending.append(container)
+            else:
+                normal_pending.append(container)
+
+        for container in long_pending:
+            container_id = int(container.get("container_id") or 0)
+            if not container_id:
+                continue
+            translated_payload = self._translate_long_container_text(container, term_hint, slide=slide)
+            translated_map[container_id] = translated_payload
+            self._cache_container_results([container], {container_id: translated_payload}, term_hint)
+
+        chunks = self._chunk_payload_containers(normal_pending)
+        courseware_id = getattr(getattr(slide, "courseware", None), "id", None)
+        slide_no = getattr(slide, "slide_no", None)
+        self._add_translation_chunks(courseware_id, len(chunks), slide_no)
         for chunk in chunks:
-            chunk_map = self._translate_container_chunk(chunk, term_hint)
+            chunk_map = self._translate_container_chunk_with_retries(chunk, term_hint, slide=slide)
             translated_map.update(chunk_map)
             self._cache_container_results(chunk, chunk_map, term_hint)
+            self._mark_translation_chunk_done(courseware_id, slide_no)
         return translated_map
 
     def _build_translated_layout(
@@ -692,7 +869,7 @@ class TranslationService:
         text_containers = [item for item in source_containers if str(item.get("kind", "")) != "image_ocr"]
         image_containers = [item for item in source_containers if str(item.get("kind", "")) == "image_ocr"]
 
-        translated_map = self._translate_containers(text_containers, term_hint)
+        translated_map = self._translate_containers(text_containers, term_hint, slide=slide)
         image_translated_map, image_source_text_map = self._translate_image_containers(slide, image_containers, term_hint)
         translated_map.update(image_translated_map)
         translated_containers: list[dict] = []

@@ -207,6 +207,9 @@ class CoursewareListView(APIView):
                     "status": item.status,
                     "last_error": item.last_error,
                     "translation_duration_seconds": build_translation_duration_seconds(item),
+                    "translation_total_chunks": item.translation_total_chunks,
+                    "translation_completed_chunks": item.translation_completed_chunks,
+                    "translation_current_slide_no": item.translation_current_slide_no,
                     "created_at": item.created_at,
                     **build_courseware_progress(item),
                 }
@@ -231,8 +234,20 @@ class TranslateCoursewareView(APIView):
         courseware.last_error = ""
         courseware.translation_started_at = timezone.now()
         courseware.translation_duration_seconds = None
+        courseware.translation_total_chunks = 0
+        courseware.translation_completed_chunks = 0
+        courseware.translation_current_slide_no = None
         courseware.save(
-            update_fields=["status", "last_error", "translation_started_at", "translation_duration_seconds", "updated_at"]
+            update_fields=[
+                "status",
+                "last_error",
+                "translation_started_at",
+                "translation_duration_seconds",
+                "translation_total_chunks",
+                "translation_completed_chunks",
+                "translation_current_slide_no",
+                "updated_at",
+            ]
         )
 
         def _translate_job(courseware_id: int, owner_id: int) -> None:
@@ -297,6 +312,9 @@ class CoursewareStatusView(APIView):
                 "status": courseware.status,
                 "last_error": courseware.last_error,
                 "translation_duration_seconds": build_translation_duration_seconds(courseware),
+                "translation_total_chunks": courseware.translation_total_chunks,
+                "translation_completed_chunks": courseware.translation_completed_chunks,
+                "translation_current_slide_no": courseware.translation_current_slide_no,
                 "updated_at": courseware.updated_at,
                 **progress,
             }
@@ -412,13 +430,20 @@ class SummaryView(APIView):
 
         summary_service = SummaryService()
         chapter_summary, key_points, term_pairs, mind_map = summary_service.generate(courseware)
-        learning_suggestions = summary_service.build_learning_suggestions(chapter_summary, key_points, term_pairs)
+        learning_suggestions = summary_service.generate_learning_suggestions(
+            chapter_summary,
+            key_points,
+            term_pairs,
+            mind_map,
+            courseware.title,
+        )
         record = SummaryRecord.objects.create(
             courseware=courseware,
             user=request.user,
             chapter_summary=chapter_summary,
             key_points=key_points,
             term_pairs=term_pairs,
+            learning_suggestions=learning_suggestions,
             mind_map=mind_map,
         )
         return Response(
@@ -445,6 +470,8 @@ class RecordsView(APIView):
             many=True,
         ).data
         for item in summary_records:
+            if item.get("learning_suggestions"):
+                continue
             chapter_summary = str(item.get("chapter_summary", "")).strip()
             key_points = item.get("key_points", []) if isinstance(item.get("key_points", []), list) else []
             term_pairs = item.get("term_pairs", []) if isinstance(item.get("term_pairs", []), list) else []

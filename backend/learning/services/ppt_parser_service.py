@@ -65,6 +65,12 @@ class PPTParserService:
         return bool(re.search(r"[A-Za-z]{2,}", flattened))
 
     @staticmethod
+    def _has_min_latin_word_count(value: str, min_words: int = 3) -> bool:
+        flattened = PPTParserService._flatten_text(value)
+        words = re.findall(r"[A-Za-z]{2,}(?:[-'][A-Za-z]{2,})*", flattened)
+        return len(words) >= max(int(min_words or 0), 1)
+
+    @staticmethod
     def _is_mostly_cjk_text(value: str) -> bool:
         counts = PPTParserService._text_script_counts(value)
         return counts["cjk"] >= 2 and counts["cjk"] >= counts["latin"]
@@ -181,6 +187,8 @@ class PPTParserService:
             return False
         if PPTParserService._is_mostly_cjk_text(normalized_source):
             return False
+        if PPTParserService._has_min_latin_word_count(normalized_source, 3):
+            return True
         if PPTParserService._is_numeric_or_symbolic_text(normalized_source):
             return False
         return PPTParserService._has_translatable_latin_text(normalized_source)
