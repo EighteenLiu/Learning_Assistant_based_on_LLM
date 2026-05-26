@@ -841,9 +841,9 @@ onUnmounted(() => {
 }
 
 .sidebar-collapsed-handle {
-  position: absolute;
-  top: 12px;
-  left: 8px;
+  position: fixed;
+  top: 112px;
+  left: 18px;
   z-index: 31;
   width: 34px;
   height: 34px;
@@ -1469,9 +1469,19 @@ onUnmounted(() => {
     width: min(320px, calc(100vw - 16px));
     max-height: calc(100vh - 24px);
   }
+
+  .sidebar-collapsed-handle {
+    top: 84px;
+    left: 14px;
+  }
 }
 
 @media (max-width: 768px) {
+  .sidebar-collapsed-handle {
+    top: 72px;
+    left: 12px;
+  }
+
   .chat-shell {
     min-height: 320px;
     max-height: none;
