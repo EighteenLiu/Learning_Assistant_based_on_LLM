@@ -18,6 +18,7 @@ class SlideRenderService:
     """
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _image_sort_key(image_path: Path) -> tuple[int, str]:
         stem = image_path.stem
         match = re.search(r"(\d+)$", stem)
@@ -26,6 +27,7 @@ class SlideRenderService:
         return 10**9, stem
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _prepare_export_dir(courseware_id: int, output_folder: str) -> Path:
         export_dir = Path(settings.MEDIA_ROOT) / output_folder / f"courseware_{courseware_id}"
         if export_dir.exists():
@@ -34,6 +36,7 @@ class SlideRenderService:
         return export_dir
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _build_image_urls(export_dir: Path, courseware_id: int, output_folder: str) -> dict[int, str]:
         image_urls: dict[int, str] = {}
         for index, image_path in enumerate(sorted(export_dir.glob("*.PNG"), key=SlideRenderService._image_sort_key), start=1):
@@ -45,6 +48,7 @@ class SlideRenderService:
         return image_urls
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _export_ppt_images(pptx_path: str, courseware_id: int, output_folder: str = "rendered_slides") -> dict[int, str]:
         try:
             import pythoncom
@@ -85,6 +89,7 @@ class SlideRenderService:
                 pass
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _export_pdf_images(pdf_path: str, courseware_id: int, output_folder: str = "rendered_slides") -> dict[int, str]:
         try:
             import fitz  # type: ignore
@@ -112,6 +117,7 @@ class SlideRenderService:
                     pass
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def export_slide_images(source_path: str, courseware_id: int, output_folder: str = "rendered_slides") -> dict[int, str]:
         suffix = str(Path(source_path).suffix or "").strip().lower()
         if PPTParserService.is_pdf_file(source_path):

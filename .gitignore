@@ -36,11 +36,12 @@ frontend/.next/
 # Logs
 *.log
 debug-*.log
+~$*
 
 # Generated documents and local thesis artifacts
 *.docx
 *.doc
+output/
 thesis_inputs/
 thesis_outputs/
 tools/generated_figures/
-git status

@@ -171,11 +171,13 @@ const isFullscreen = ref(false);
 const center = { x: 620, y: 360 };
 const baseViewBox = { x: 0, y: 0, width: 1240, height: 720 };
 
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const normalizeTitle = (value: unknown, fallback = "课程全景") => {
   const title = String(value || "").replace(/\s+/g, " ").trim();
   return title || fallback;
 };
 
+// 实现 measureNode 对应的核心处理，封装输入转换、状态更新或结果返回。
 const measureNode = (title: string, depth: number) => {
   const width = depth === 0 ? 250 : depth === 1 ? 210 : 180;
   const estimatedLines = Math.min(3, Math.max(1, Math.ceil(title.length / (depth === 0 ? 13 : 11))));
@@ -185,6 +187,7 @@ const measureNode = (title: string, depth: number) => {
   };
 };
 
+// 实现 wrapTitle 对应的核心处理，封装输入转换、状态更新或结果返回。
 const wrapTitle = (title: string, depth: number) => {
   const limit = depth === 0 ? 12 : depth === 1 ? 10 : 9;
   const normalized = normalizeTitle(title);
@@ -201,13 +204,16 @@ const wrapTitle = (title: string, depth: number) => {
   return lines.length ? lines : ["主题"];
 };
 
+// 实现 clamp 对应的核心处理，封装输入转换、状态更新或结果返回。
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+// 实现 polarPoint 对应的核心处理，封装输入转换、状态更新或结果返回。
 const polarPoint = (originX: number, originY: number, angle: number, radius: number) => ({
   x: originX + Math.cos(angle) * radius,
   y: originY + Math.sin(angle) * radius,
 });
 
+// 实现 branchAngles 对应的核心处理，封装输入转换、状态更新或结果返回。
 const branchAngles = (count: number, parentAngle = 0, depth = 1) => {
   if (count <= 1) {
     return [parentAngle];
@@ -222,6 +228,7 @@ const branchAngles = (count: number, parentAngle = 0, depth = 1) => {
   return Array.from({ length: count }, (_, index) => start + (spread * index) / (count - 1));
 };
 
+// 实现 applyManualOffset 对应的核心处理，封装输入转换、状态更新或结果返回。
 const applyManualOffset = (id: string, x: number, y: number) => {
   const offset = nodeOffsets.value[id] || { x: 0, y: 0 };
   return {
@@ -230,6 +237,7 @@ const applyManualOffset = (id: string, x: number, y: number) => {
   };
 };
 
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const buildLayout = () => {
   const nodes: LayoutNode[] = [];
   const edges: LayoutEdge[] = [];
@@ -328,6 +336,7 @@ const viewBox = computed(() => {
 
 const canvasTransform = computed(() => `translate(${pan.value.x} ${pan.value.y}) scale(${zoom.value})`);
 
+// 实现 toggleNode 对应的核心处理，封装输入转换、状态更新或结果返回。
 const toggleNode = (item: LayoutNode) => {
   if (!item.childCount) {
     return;
@@ -341,6 +350,7 @@ const toggleNode = (item: LayoutNode) => {
   collapsedIds.value = next;
 };
 
+// 实现 handleNodeClick 对应的核心处理，封装输入转换、状态更新或结果返回。
 const handleNodeClick = (item: LayoutNode) => {
   if (suppressClick.value) {
     suppressClick.value = false;
@@ -349,24 +359,29 @@ const handleNodeClick = (item: LayoutNode) => {
   toggleNode(item);
 };
 
+// 实现 zoomIn 对应的核心处理，封装输入转换、状态更新或结果返回。
 const zoomIn = () => {
   zoom.value = clamp(Number((zoom.value + 0.12).toFixed(2)), 0.62, 1.65);
 };
 
+// 实现 zoomOut 对应的核心处理，封装输入转换、状态更新或结果返回。
 const zoomOut = () => {
   zoom.value = clamp(Number((zoom.value - 0.12).toFixed(2)), 0.62, 1.65);
 };
 
+// 实现 resetView 对应的核心处理，封装输入转换、状态更新或结果返回。
 const resetView = () => {
   zoom.value = 1;
   pan.value = { x: 0, y: 0 };
   nodeOffsets.value = {};
 };
 
+// 实现 syncFullscreenState 对应的核心处理，封装输入转换、状态更新或结果返回。
 const syncFullscreenState = () => {
   isFullscreen.value = document.fullscreenElement === mapRef.value;
 };
 
+// 实现 toggleFullscreen 对应的核心处理，封装输入转换、状态更新或结果返回。
 const toggleFullscreen = async () => {
   if (!mapRef.value) {
     return;
@@ -378,11 +393,13 @@ const toggleFullscreen = async () => {
   await mapRef.value.requestFullscreen();
 };
 
+// 实现 onWheel 对应的核心处理，封装输入转换、状态更新或结果返回。
 const onWheel = (event: WheelEvent) => {
   const delta = event.deltaY > 0 ? -0.08 : 0.08;
   zoom.value = clamp(Number((zoom.value + delta).toFixed(2)), 0.62, 1.65);
 };
 
+// 实现 startPan 对应的核心处理，封装输入转换、状态更新或结果返回。
 const startPan = (event: PointerEvent) => {
   if (nodeDragStart.value) {
     return;
@@ -395,6 +412,7 @@ const startPan = (event: PointerEvent) => {
   };
 };
 
+// 实现 clientDeltaToCanvas 对应的核心处理，封装输入转换、状态更新或结果返回。
 const clientDeltaToCanvas = (dx: number, dy: number) => {
   const rect = svgRef.value?.getBoundingClientRect();
   if (!rect) {
@@ -406,6 +424,7 @@ const clientDeltaToCanvas = (dx: number, dy: number) => {
   };
 };
 
+// 实现 startNodeDrag 对应的核心处理，封装输入转换、状态更新或结果返回。
 const startNodeDrag = (event: PointerEvent, item: LayoutNode) => {
   const offset = nodeOffsets.value[item.id] || { x: 0, y: 0 };
   nodeDragStart.value = {
@@ -420,6 +439,7 @@ const startNodeDrag = (event: PointerEvent, item: LayoutNode) => {
   target.setPointerCapture?.(event.pointerId);
 };
 
+// 实现 movePan 对应的核心处理，封装输入转换、状态更新或结果返回。
 const movePan = (event: PointerEvent) => {
   if (nodeDragStart.value) {
     const delta = clientDeltaToCanvas(event.clientX - nodeDragStart.value.x, event.clientY - nodeDragStart.value.y);
@@ -443,6 +463,7 @@ const movePan = (event: PointerEvent) => {
   };
 };
 
+// 实现 stopPan 对应的核心处理，封装输入转换、状态更新或结果返回。
 const stopPan = () => {
   if (nodeDragStart.value?.moved) {
     suppressClick.value = true;

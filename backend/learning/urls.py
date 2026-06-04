@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    MeView,
     CoursewareListView,
     CoursewareSlidesView,
     CoursewareUploadView,
@@ -17,6 +18,7 @@ from .views import (
 
 
 urlpatterns = [
+    path("auth/me", MeView.as_view(), name="me"),
     path("auth/register", RegisterView.as_view(), name="register"),
     path("auth/login", LoginView.as_view(), name="login"),
     path("coursewares", CoursewareListView.as_view(), name="courseware-list"),

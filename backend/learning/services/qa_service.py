@@ -7,11 +7,13 @@ from .vector_index_service import VectorIndexService
 
 
 class QAService:
+    # 初始化当前对象需要的依赖和运行参数。
     def __init__(self):
         self.client = OpenAICompatibleClient()
         self.index_service = VectorIndexService()
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _slide_payload(slide) -> str:
         parts = []
         title = (slide.title or "").strip()
@@ -26,6 +28,7 @@ class QAService:
         return "\n".join(parts).strip()
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _build_history_text(history: list[dict]) -> str:
         lines: list[str] = []
         for item in history:
@@ -37,6 +40,7 @@ class QAService:
             lines.append(f"{speaker}：{content}")
         return "\n".join(lines).strip()
 
+    # 实现问答上下文构建和结果整理，保证回答与课件内容关联。
     def _build_page_context(self, courseware: Courseware, question: str, slide_no: int) -> tuple[str, list[dict]]:
         current_slide = courseware.slides.filter(slide_no=slide_no).first()
         context_parts: list[str] = []
@@ -44,12 +48,14 @@ class QAService:
         seen_slide_nos: set[int] = set()
 
         if current_slide:
+            # 当前页问答先放入当前页完整内容，保证回答不会偏离用户正在看的页面。
             payload = self._slide_payload(current_slide)
             if payload:
                 context_parts.append(f"[当前页 {current_slide.slide_no}]\n{payload}")
                 citations.append({"slide_no": current_slide.slide_no, "snippet": payload[:240]})
                 seen_slide_nos.add(current_slide.slide_no)
 
+        # 再补充少量相似页，解决概念跨页展开时“只看当前页信息不足”的问题。
         related_hits = self.index_service.query(courseware.id, question, top_k=3)
         for hit in related_hits:
             hit_slide_no = int(hit.get("slide_no") or 0)
@@ -63,12 +69,14 @@ class QAService:
             context_parts.append("未检索到可用课件上下文。")
         return "\n\n".join(context_parts), citations
 
+    # 实现问答上下文构建和结果整理，保证回答与课件内容关联。
     def _build_courseware_context(self, courseware: Courseware, question: str) -> tuple[str, list[dict]]:
         slides = list(courseware.slides.all())
         compiled: list[str] = []
         total_length = 0
 
         for slide in slides:
+            # 全局问答尽量拼接整份课件，但设置长度上限，避免超过模型上下文窗口。
             payload = self._slide_payload(slide)
             if not payload:
                 continue
@@ -78,11 +86,13 @@ class QAService:
             compiled.append(chunk)
             total_length += len(chunk)
 
+        # 引用页码来自向量检索结果，答案可以整体阅读，引用则保持可追踪。
         hits = self.index_service.query(courseware.id, question, top_k=5)
         citations = [{"slide_no": hit["slide_no"], "snippet": hit["content"][:240]} for hit in hits]
         context = "\n\n".join(compiled) or "未检索到可用课件上下文。"
         return context, citations
 
+    # 实现问答上下文构建和结果整理，保证回答与课件内容关联。
     def ask(
         self,
         courseware: Courseware,

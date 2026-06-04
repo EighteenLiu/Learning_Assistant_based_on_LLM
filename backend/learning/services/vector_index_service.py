@@ -8,6 +8,7 @@ from app.debug_logger import debug_log
 
 
 class VectorIndexService:
+    # 初始化当前对象需要的依赖和运行参数。
     def __init__(self):
         #region agent log H3_vector_init_attempt
         debug_log(
@@ -40,16 +41,20 @@ class VectorIndexService:
             raise
 
     @staticmethod
+    # 实现向量索引或检索处理，为课件问答提供可追溯的相关片段。
     def _doc_id(courseware_id: int, slide_no: int) -> str:
         return f"courseware-{courseware_id}-slide-{slide_no}"
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _build_where(courseware_id: int, slide_no: int | None = None) -> dict:
         if slide_no is None:
             return {"courseware_id": courseware_id}
         return {"$and": [{"courseware_id": courseware_id}, {"slide_no": slide_no}]}
 
+    # 实现向量索引或检索处理，为课件问答提供可追溯的相关片段。
     def rebuild_courseware_index(self, courseware, slides):
+        # 索引按课件页重建，先删除旧文档再写入新译文，避免同一页翻译更新后检索命中旧内容。
         existing_ids = [self._doc_id(courseware.id, slide.slide_no) for slide in slides]
         if existing_ids:
             existing = self.collection.get(ids=existing_ids, include=[])
@@ -69,6 +74,7 @@ class VectorIndexService:
             documents.append(content)
             metadatas.append(
                 {
+                    # metadata 保存 owner_id 和 slide_no，既方便按课件过滤，也方便答案回传引用页码。
                     "courseware_id": courseware.id,
                     "slide_no": slide.slide_no,
                     "owner_id": courseware.owner_id,
@@ -77,7 +83,9 @@ class VectorIndexService:
         if ids:
             self.collection.add(documents=documents, metadatas=metadatas, ids=ids)
 
+    # 实现向量索引或检索处理，为课件问答提供可追溯的相关片段。
     def query(self, courseware_id: int, question: str, top_k: int = 3, slide_no: int | None = None) -> list[dict]:
+        # where 条件把检索范围限制在当前课件，避免不同用户或不同课件之间串内容。
         results = self.collection.query(
             query_texts=[question],
             n_results=top_k,

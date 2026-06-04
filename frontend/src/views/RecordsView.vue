@@ -419,6 +419,7 @@ const qaScopeLabel = computed(() => {
   return "未选择页码";
 });
 
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const formatDuration = (totalSeconds?: number | null) => {
   const sec = Math.max(Math.floor(Number(totalSeconds || 0)), 0);
   const hours = Math.floor(sec / 3600);
@@ -429,6 +430,7 @@ const formatDuration = (totalSeconds?: number | null) => {
   return `${seconds}秒`;
 };
 
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const formatCoursewareDuration = (courseware?: CoursewareItem | null) => {
   if (!courseware || courseware.translation_duration_seconds == null) {
     return "暂无";
@@ -437,7 +439,9 @@ const formatCoursewareDuration = (courseware?: CoursewareItem | null) => {
 };
 
 const currentCoursewareDuration = computed(() => formatCoursewareDuration(currentCourseware.value));
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const formatTime = (value: string) => new Date(value).toLocaleString("zh-CN");
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const renderMarkdown = (content: string) => markdown.render(content || "");
 
 const getDefaultMessages = (): ChatMessageItem[] => [
@@ -491,6 +495,7 @@ const normalizeSummaryRecord = (record: any): SummaryRecordItem => ({
 
 
 
+// 实现 canvasStyle 对应的核心处理，封装输入转换、状态更新或结果返回。
 const canvasStyle = (layout?: SlideLayout, text?: string) => {
   const pageWidth = Number(layout?.page_width) || 16;
   const pageHeight = Number(layout?.page_height) || 9;
@@ -501,6 +506,7 @@ const canvasStyle = (layout?: SlideLayout, text?: string) => {
   };
 };
 
+// 实现 blockStyle 对应的核心处理，封装输入转换、状态更新或结果返回。
 const blockStyle = (block: SlideLayoutBlock) => ({
   left: `${(block.x || 0) * 100}%`,
   top: `${(block.y || 0) * 100}%`,
@@ -508,6 +514,7 @@ const blockStyle = (block: SlideLayoutBlock) => ({
   height: `${(block.h || 0) * 100}%`,
 });
 
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const buildScopeLabelFromRecord = (record: QARecordItem) => {
   const uniqueSlides = [...new Set((record.citations || []).map((item) => item.slide_no).filter(Boolean))];
   if (uniqueSlides.length === 1) {
@@ -519,6 +526,7 @@ const buildScopeLabelFromRecord = (record: QARecordItem) => {
   return "历史记录";
 };
 
+// 实现 hydrateMessages 对应的核心处理，封装输入转换、状态更新或结果返回。
 const hydrateMessages = () => {
   const recentRecords = [...qaRecords.value].slice(0, 8).reverse();
   if (!recentRecords.length) {
@@ -545,10 +553,12 @@ const hydrateMessages = () => {
   ];
 };
 
+// 实现 goWorkbench 对应的核心处理，封装输入转换、状态更新或结果返回。
 const goWorkbench = async () => {
   await router.push("/dashboard/upload");
 };
 
+// 实现 pinToWorkbench 对应的核心处理，封装输入转换、状态更新或结果返回。
 const pinToWorkbench = async () => {
   if (selectedCoursewareId.value) {
     localStorage.setItem("selected_courseware_id", String(selectedCoursewareId.value));
@@ -557,6 +567,7 @@ const pinToWorkbench = async () => {
   await router.push("/dashboard/upload#qa-section");
 };
 
+// 实现 fetchCoursewares 对应的核心处理，封装输入转换、状态更新或结果返回。
 const fetchCoursewares = async () => {
   const { data } = await http.get<CoursewareItem[]>("/coursewares");
   coursewares.value = data;
@@ -566,6 +577,7 @@ const fetchCoursewares = async () => {
   }
 };
 
+// 实现 loadAll 对应的核心处理，封装输入转换、状态更新或结果返回。
 const loadAll = async () => {
   const selected = selectedCoursewareId.value;
   if (!selected) {
@@ -603,6 +615,7 @@ const loadAll = async () => {
   }
 };
 
+// 实现 selectCourseware 对应的核心处理，封装输入转换、状态更新或结果返回。
 const selectCourseware = async (coursewareId: number) => {
   selectedCoursewareId.value = coursewareId;
   localStorage.setItem("selected_courseware_id", String(coursewareId));
@@ -610,6 +623,7 @@ const selectCourseware = async (coursewareId: number) => {
   await loadAll();
 };
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const focusSlide = (slideNo: number) => {
   if (!slideNo) {
     return;
@@ -618,6 +632,7 @@ const focusSlide = (slideNo: number) => {
   previewJumpNo.value = slideNo;
 };
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const prevSlide = () => {
   if (!slides.value.length || currentSlideIndex.value <= 0) {
     return;
@@ -628,6 +643,7 @@ const prevSlide = () => {
   }
 };
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const nextSlide = () => {
   if (!slides.value.length || currentSlideIndex.value >= slides.value.length - 1) {
     return;
@@ -639,6 +655,7 @@ const nextSlide = () => {
 };
 
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const jumpPreviewSlide = () => {
   if (!slides.value.length) {
     return;
@@ -656,11 +673,13 @@ const jumpPreviewSlide = () => {
   focusSlide(targetNo);
 };
 
+// 实现 resetConversation 对应的核心处理，封装输入转换、状态更新或结果返回。
 const resetConversation = () => {
   question.value = "";
   hydrateMessages();
 };
 
+// 实现问答上下文构建和结果整理，保证回答与课件内容关联。
 const handleQuestionKeydown = (event: KeyboardEvent) => {
   if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
     return;
@@ -671,6 +690,7 @@ const handleQuestionKeydown = (event: KeyboardEvent) => {
   }
 };
 
+// 实现问答上下文构建和结果整理，保证回答与课件内容关联。
 const submitQuestion = async () => {
   const selected = selectedCoursewareId.value;
   if (!selected) {
@@ -732,6 +752,7 @@ const submitQuestion = async () => {
   }
 };
 
+// 实现课件总结和学习建议的数据整理，并提供可用的兜底结果。
 const generateSummary = async () => {
   const selected = selectedCoursewareId.value;
   if (!selected) {
@@ -751,6 +772,7 @@ const generateSummary = async () => {
   }
 };
 
+// 实现 handleSelectionEvent 对应的核心处理，封装输入转换、状态更新或结果返回。
 const handleSelectionEvent = async () => {
   const stored = localStorage.getItem("selected_courseware_id");
   selectedCoursewareId.value = stored ? Number(stored) : undefined;

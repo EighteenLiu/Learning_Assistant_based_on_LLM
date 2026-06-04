@@ -12,6 +12,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ("id", "username", "password")
 
+    # 根据校验后的数据创建业务对象，并补齐必要的派生字段。
     def create(self, validated_data):
         return User.objects.create_user(
             username=validated_data["username"],
@@ -30,21 +31,26 @@ class CoursewareUploadSerializer(serializers.ModelSerializer):
         fields = ("id", "title", "file", "source_language", "target_language", "status", "created_at")
         read_only_fields = ("id", "title", "status", "created_at")
 
+    # 校验上传文件格式，只放行系统解析链路支持的课件类型。
     def validate_file(self, file_obj):
+        # 在序列化层先拦截格式，比进入解析服务后再失败更容易给调用方返回稳定的 400 错误。
         supported_formats = [".pptx", ".ppt", ".pdf"]
         file_ext = Path(file_obj.name).suffix.lower()
         if file_ext not in supported_formats:
             raise serializers.ValidationError(f"Only {', '.join(supported_formats)} files are supported.")
         return file_obj
 
+    # 根据校验后的数据创建业务对象，并补齐必要的派生字段。
     def create(self, validated_data):
         file_obj = validated_data["file"]
         owner = validated_data.get("owner")
+        # 标题从原始文件名派生，并在同一用户范围内做去重，避免列表里出现多个同名课件无法区分。
         base_title = Path(file_obj.name or "").stem.strip() or "untitled"
         validated_data["title"] = self._build_unique_title(owner, base_title)
         return super().create(validated_data)
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _build_unique_title(owner, base_title: str) -> str:
         if owner is None:
             return base_title
@@ -86,13 +92,16 @@ class QARequestSerializer(serializers.Serializer):
     slide_no = serializers.IntegerField(required=False, min_value=1)
     use_global_scope = serializers.BooleanField(required=False, default=True)
 
+    # 清理并校验用户问题，防止空问题进入问答模型。
     def validate_question(self, value):
         stripped = value.strip()
         if not stripped:
             raise serializers.ValidationError("Question cannot be empty.")
         return stripped
 
+    # 清洗历史对话，只保留合法角色和有限长度的上下文。
     def validate_history(self, value):
+        # 只保留最近的有效对话并限制单条长度，既能支持多轮追问，也能控制 LLM 请求体大小。
         cleaned = []
         for item in value[:12]:
             if not isinstance(item, dict):

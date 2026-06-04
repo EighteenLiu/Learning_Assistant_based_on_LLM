@@ -106,6 +106,7 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
+# 实现 _env_bool 对应的核心处理，封装输入转换、状态更新或结果返回。
 def _env_bool(name: str, default: str = "0") -> bool:
     return str(os.getenv(name, default) or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -119,7 +120,7 @@ if USE_LOCAL_LLM:
 else:
     OPENAI_BASE_URL = str(os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1") or "").strip().rstrip("/")
     OPENAI_API_KEY = str(os.getenv("OPENAI_API_KEY", "") or "").strip()
-    OPENAI_MODEL = str(os.getenv("OPENAI_MODEL", "qwen-plus") or "").strip()#
+    OPENAI_MODEL = str(os.getenv("OPENAI_MODEL", "qwen3.6-plus") or "").strip()#
 
 TRANSLATION_MAX_WORKERS = max(int(os.getenv("TRANSLATION_MAX_WORKERS", "1") or 1), 1)
 TRANSLATION_CHUNK_MAX_CONTAINERS = max(int(os.getenv("TRANSLATION_CHUNK_MAX_CONTAINERS", "6") or 1), 1)

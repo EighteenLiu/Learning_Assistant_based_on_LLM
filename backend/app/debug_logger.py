@@ -10,6 +10,7 @@ SESSION_ID = "2c45df"
 LOG_PATH = Path(__file__).resolve().parents[2] / "debug-2c45df.log"
 
 
+# 实现 debug_log 对应的核心处理，封装输入转换、状态更新或结果返回。
 def debug_log(
     *,
     hypothesisId: str,

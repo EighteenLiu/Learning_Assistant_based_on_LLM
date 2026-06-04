@@ -402,6 +402,7 @@ const translatedBlocks = computed(() => {
 
 const processedSlides = computed(() => Math.max(Number(translationProgress.value.translated || 0), 0));
 
+// 实现 resolveTranslationElapsedSeconds 对应的核心处理，封装输入转换、状态更新或结果返回。
 const resolveTranslationElapsedSeconds = () => {
   if (typeof translationElapsedSeconds.value === "number" && Number.isFinite(translationElapsedSeconds.value)) {
     return Math.max(translationElapsedSeconds.value, 0);
@@ -412,12 +413,14 @@ const resolveTranslationElapsedSeconds = () => {
   return 0;
 };
 
+// 实现 updateEstimatedRemainingSeconds 对应的核心处理，封装输入转换、状态更新或结果返回。
 const updateEstimatedRemainingSeconds = () => {
   if (coursewareStatus.value !== "translating") {
     smoothedEtaSeconds.value = null;
     return;
   }
 
+  // ETA 同时参考“已完成页数”和“已完成分块数”：前期 chunk 更敏感，后期页数更稳定。
   const totalSlides = Math.max(Number(translationProgress.value.total || slides.value.length || 0), 0);
   const translatedSlides = Math.max(Number(translationProgress.value.translated || 0), 0);
   const totalChunks = Math.max(Number(translationProgress.value.totalChunks || 0), 0);
@@ -462,6 +465,7 @@ const updateEstimatedRemainingSeconds = () => {
   }
 
   const progressRatio = totalSlides > 0 ? translatedSlides / totalSlides : 0;
+  // 进度越靠后越相信最新速度，避免早期单页耗时把剩余时间估得过大。
   const smoothingFactor = progressRatio >= 0.5 ? 0.45 : 0.3;
   smoothedEtaSeconds.value = smoothedEtaSeconds.value * (1 - smoothingFactor) + boundedEta * smoothingFactor;
 };
@@ -489,6 +493,7 @@ const chunkProgressLabel = computed(() => {
   return `${Number(translationProgress.value.completedChunks || 0)} / ${totalChunks}${currentSlide}`;
 });
 
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const formatDuration = (totalSeconds: number) => {
   const sec = Math.max(Math.floor(totalSeconds), 0);
   const hours = Math.floor(sec / 3600);
@@ -523,6 +528,7 @@ const estimatedTimeRemaining = computed(() => {
 */
 });
 
+// 实现 resetTranslationTiming 对应的核心处理，封装输入转换、状态更新或结果返回。
 const resetTranslationTiming = () => {
   translationStartedAt.value = null;
   translationElapsedSeconds.value = null;
@@ -607,21 +613,25 @@ const statusTips = computed(() => {
   return ["请先上传或选择一个课件，然后点击“开始翻译”启动任务。"];
 });
 
+// 实现 getSelectedCoursewareId 对应的核心处理，封装输入转换、状态更新或结果返回。
 const getSelectedCoursewareId = () => {
   const stored = localStorage.getItem("selected_courseware_id");
   return stored ? Number(stored) : undefined;
 };
 
+// 实现数据规范化和结构构建，让调用方获得稳定的输出。
 const formatDate = (value: string) => {
   if (!value) return "暂无";
   return new Date(value).toLocaleString("zh-CN");
 };
 
+// 实现 onFileChange 对应的核心处理，封装输入转换、状态更新或结果返回。
 const onFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
   file.value = target.files?.[0] || null;
 };
 
+// 实现 canvasStyle 对应的核心处理，封装输入转换、状态更新或结果返回。
 const canvasStyle = (layout?: SlideLayout, text?: string) => {
   const pageWidth = Number(layout?.page_width) || 16;
   const pageHeight = Number(layout?.page_height) || 9;
@@ -632,6 +642,7 @@ const canvasStyle = (layout?: SlideLayout, text?: string) => {
   };
 };
 
+// 实现 blockStyle 对应的核心处理，封装输入转换、状态更新或结果返回。
 const blockStyle = (block: SlideLayoutBlock) => ({
   left: `${(block.x || 0) * 100}%`,
   top: `${(block.y || 0) * 100}%`,
@@ -639,6 +650,7 @@ const blockStyle = (block: SlideLayoutBlock) => ({
   height: `${(block.h || 0) * 100}%`,
 });
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const renderMarkdown = (content: string) => markdown.render(content || "");
 
 const normalizeMindMap = (node: any, fallbackTitle = "课程全景"): SummaryPayload["mind_map"] => {
@@ -652,6 +664,7 @@ const normalizeMindMap = (node: any, fallbackTitle = "课程全景"): SummaryPay
   return { title, children };
 };
 
+// 后端可能返回历史记录或新生成结果，这里做一次结构归一化，避免模板里反复判空。
 const normalizeSummaryPayload = (payload: any): SummaryPayload => ({
   chapter_summary: String(payload?.chapter_summary || "总结已生成。"),
   key_points: Array.isArray(payload?.key_points) ? payload.key_points.map((item: any) => String(item)) : [],
@@ -669,6 +682,7 @@ const normalizeSummaryPayload = (payload: any): SummaryPayload => ({
   mind_map: normalizeMindMap(payload?.mind_map, selectedCoursewareTitle.value || "课程全景"),
 });
 
+// 实现 resetLearningPanels 对应的核心处理，封装输入转换、状态更新或结果返回。
 const resetLearningPanels = () => {
   summary.value = null;
   question.value = "";
@@ -682,8 +696,10 @@ const resetLearningPanels = () => {
   ];
 };
 
+// 实现状态和进度计算，为前端展示提供一致的任务信息。
 const refreshCoursewareStatus = async (coursewareId: number) => {
   try {
+    // 状态接口是长任务轮询的唯一数据源，前端不自行推断后台是否完成。
     const { data } = await http.get(`/coursewares/${coursewareId}/status`);
     coursewareStatus.value = data.status;
     if (data.status !== "translating") {
@@ -726,6 +742,7 @@ const refreshCoursewareStatus = async (coursewareId: number) => {
   }
 };
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const loadSlides = async (coursewareId: number) => {
   const prevSlideNo = currentSlide.value?.slide_no;
   const { data } = await http.get<SlideItem[]>(`/coursewares/${coursewareId}/slides`);
@@ -739,6 +756,7 @@ const loadSlides = async (coursewareId: number) => {
   jumpSlideNo.value = currentSlide.value?.slide_no ?? null;
 };
 
+// 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
 const ensureVisibleTranslatedSlide = () => {
   const current = currentSlide.value;
   const currentReady = Boolean(
@@ -762,7 +780,9 @@ const ensureVisibleTranslatedSlide = () => {
   }
 };
 
+// 实现 hydrateCurrentCourseware 对应的核心处理，封装输入转换、状态更新或结果返回。
 const hydrateCurrentCourseware = async () => {
+  // 切换课件时同时刷新状态、页数据和本地选择，保证预览区与右上角选择保持一致。
   selectedCoursewareId.value = getSelectedCoursewareId();
   if (!selectedCoursewareId.value) {
     slides.value = [];
@@ -779,18 +799,21 @@ const hydrateCurrentCourseware = async () => {
   await Promise.all([loadSlides(selectedCoursewareId.value), refreshCoursewareStatus(selectedCoursewareId.value)]);
 };
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const prevSlide = () => {
   if (currentSlideIndex.value > 0) {
     currentSlideIndex.value -= 1;
   }
 };
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const nextSlide = () => {
   if (currentSlideIndex.value < slides.value.length - 1) {
     currentSlideIndex.value += 1;
   }
 };
 
+// 实现课件预览或导出处理，把布局数据转换为可视化结果。
 const jumpToSlide = () => {
   if (!slides.value.length) {
     return;
@@ -808,6 +831,7 @@ const jumpToSlide = () => {
   currentSlideIndex.value = targetIndex;
 };
 
+// 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
 const translateCurrentNotes = async () => {
   const selected = getSelectedCoursewareId();
   const slide = currentSlide.value;
@@ -836,6 +860,7 @@ const translateCurrentNotes = async () => {
   }
 };
 
+// 实现 uploadFile 对应的核心处理，封装输入转换、状态更新或结果返回。
 const uploadFile = async () => {
   if (!file.value) {
     ElMessage.warning("请先选择课件文件");
@@ -878,6 +903,7 @@ const uploadFile = async () => {
   }
 };
 
+// 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
 const translateCurrent = async () => {
   const selected = getSelectedCoursewareId();
   if (!selected) {
@@ -894,6 +920,7 @@ const translateCurrent = async () => {
   updateEstimatedRemainingSeconds();
 
   try {
+    // 翻译接口只负责启动后台任务，随后通过状态接口轮询，避免 HTTP 请求一直占用到任务完成。
     const forceSuffix = coursewareStatus.value === "translated" ? "?force=1" : "";
     await http.post(`/coursewares/${selected}/translate${forceSuffix}`);
 
@@ -957,6 +984,7 @@ const translateCurrent = async () => {
   }
 };
 
+// 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
 const downloadTranslatedPpt = async () => {
   const selected = getSelectedCoursewareId();
   if (!selected) {
@@ -984,6 +1012,7 @@ const downloadTranslatedPpt = async () => {
 
   exportingPpt.value = true;
   try {
+    // 导出接口返回二进制文件，前端从 Content-Disposition 解析文件名后触发浏览器下载。
     const response = await http.get(`/coursewares/${selected}/export-translated-ppt`, {
       responseType: "blob",
     });
@@ -1030,6 +1059,7 @@ const downloadTranslatedPpt = async () => {
   }
 };
 
+// 实现 clearChat 对应的核心处理，封装输入转换、状态更新或结果返回。
 const clearChat = () => {
   messages.value = [
     {
@@ -1039,6 +1069,7 @@ const clearChat = () => {
   ];
 };
 
+// 实现 copyMessage 对应的核心处理，封装输入转换、状态更新或结果返回。
 const copyMessage = async (content: string) => {
   try {
     await navigator.clipboard.writeText(content || "");
@@ -1048,6 +1079,7 @@ const copyMessage = async (content: string) => {
   }
 };
 
+// 实现问答上下文构建和结果整理，保证回答与课件内容关联。
 const handleQuestionKeydown = (event: KeyboardEvent) => {
   if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
     return;
@@ -1058,6 +1090,7 @@ const handleQuestionKeydown = (event: KeyboardEvent) => {
   }
 };
 
+// 实现问答上下文构建和结果整理，保证回答与课件内容关联。
 const submitQuestion = async () => {
   const selected = Number(localStorage.getItem("selected_courseware_id"));
   if (!selected) {
@@ -1080,6 +1113,7 @@ const submitQuestion = async () => {
   qaLoading.value = true;
 
   try {
+    // 只把当前问题之前的消息作为 history 发给后端，避免把待回答问题重复塞进上下文。
     const history = messages.value
       .slice(0, -1)
       .filter((item) => item.role === "user" || item.role === "assistant")
@@ -1104,6 +1138,7 @@ const submitQuestion = async () => {
   }
 };
 
+// 实现课件总结和学习建议的数据整理，并提供可用的兜底结果。
 const generateSummary = async () => {
   const selected = Number(localStorage.getItem("selected_courseware_id"));
   if (!selected) {
@@ -1122,6 +1157,7 @@ const generateSummary = async () => {
   }
 };
 
+// 实现 handleCoursewareChange 对应的核心处理，封装输入转换、状态更新或结果返回。
 const handleCoursewareChange = async () => {
   try {
     await hydrateCurrentCourseware();

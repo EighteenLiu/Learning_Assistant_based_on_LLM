@@ -27,6 +27,7 @@ class ChatMessage:
 
 
 class OpenAICompatibleClient:
+    # 初始化当前对象需要的依赖和运行参数。
     def __init__(self):
         self.base_url = str(settings.OPENAI_BASE_URL or "").strip().rstrip("/")
         self.api_key = str(settings.OPENAI_API_KEY or "").strip()
@@ -40,25 +41,31 @@ class OpenAICompatibleClient:
             self.request_timeout_seconds = max(self.request_timeout_seconds, 120.0)
 
     @staticmethod
+    # 实现状态和进度计算，为前端展示提供一致的任务信息。
     def _is_retryable_status(status_code: int | None) -> bool:
         return status_code in {408, 409, 425, 429, 500, 502, 503, 504}
 
     @staticmethod
+    # 实现 _safe_text 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _safe_text(value: object, max_len: int = 500) -> str:
         return str(value or "")[:max_len]
 
     @staticmethod
+    # 实现 _serialize_content 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _serialize_content(content: Any) -> Any:
         if isinstance(content, (str, list, dict)):
             return content
         return str(content or "")
 
     @staticmethod
+    # 实现 _is_local_ollama_endpoint 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _is_local_ollama_endpoint(base_url: str) -> bool:
         value = str(base_url or "").strip().lower()
         return "localhost:11434" in value or "127.0.0.1:11434" in value
 
+    # 实现 _reload_from_dotenv 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _reload_from_dotenv(self) -> bool:
+        # 运行期重新读取 .env，方便切换本地 Ollama/云端模型或更新 key 后立刻生效。
         changed = False
         env_path = Path(getattr(settings, "BASE_DIR", Path("."))) / ".env"
         if not env_path.exists():
@@ -114,12 +121,14 @@ class OpenAICompatibleClient:
             except Exception:
                 pass
         if self._is_local_ollama_endpoint(self.base_url):
+            # 本地模型首 token 和视觉模型耗时通常更长，单独放宽超时，避免大课件 OCR 时误判失败。
             timeout_candidate = max(timeout_candidate, 120.0)
         if timeout_candidate != self.request_timeout_seconds:
             self.request_timeout_seconds = timeout_candidate
             changed = True
         return changed
 
+    # 实现 chat 对应的核心处理，封装输入转换、状态更新或结果返回。
     def chat(self, messages: list[ChatMessage], temperature: float = 0.2, _allow_auth_retry: bool = True) -> str:
         # Pull latest local runtime config on each call, so .env tuning can take effect
         # immediately without requiring a Django restart.
@@ -191,6 +200,7 @@ class OpenAICompatibleClient:
                     return self.chat(messages, temperature=temperature, _allow_auth_retry=False)
 
                 should_retry = (
+                    # 只重试网络抖动、限流和服务端临时错误；认证错误会走专门的刷新逻辑，避免盲目重试。
                     attempt < self.max_retries
                     and (
                         self._is_retryable_status(status_code)

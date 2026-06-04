@@ -4,6 +4,7 @@ import sys
 
 from app.debug_logger import debug_log
 
+# 启动 Django 命令行入口，读取运行环境并交给框架执行对应管理命令。
 def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings')
     #region agent log H1_manage_start

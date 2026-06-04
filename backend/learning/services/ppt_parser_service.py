@@ -40,6 +40,7 @@ class PPTParserService:
     }
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _normalize_text(value: str) -> str:
         if not value:
             return ""
@@ -47,10 +48,12 @@ class PPTParserService:
         return "\n".join([line for line in lines if line])
 
     @staticmethod
+    # 实现 _flatten_text 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _flatten_text(value: str) -> str:
         return re.sub(r"\s+", " ", PPTParserService._normalize_text(value)).strip()
 
     @staticmethod
+    # 实现 _text_script_counts 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _text_script_counts(value: str) -> dict[str, int]:
         flattened = PPTParserService._flatten_text(value)
         return {
@@ -60,27 +63,32 @@ class PPTParserService:
         }
 
     @staticmethod
+    # 实现 _has_translatable_latin_text 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _has_translatable_latin_text(value: str) -> bool:
         flattened = PPTParserService._flatten_text(value)
         return bool(re.search(r"[A-Za-z]{2,}", flattened))
 
     @staticmethod
+    # 实现 _has_min_latin_word_count 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _has_min_latin_word_count(value: str, min_words: int = 3) -> bool:
         flattened = PPTParserService._flatten_text(value)
         words = re.findall(r"[A-Za-z]{2,}(?:[-'][A-Za-z]{2,})*", flattened)
         return len(words) >= max(int(min_words or 0), 1)
 
     @staticmethod
+    # 实现 _is_mostly_cjk_text 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _is_mostly_cjk_text(value: str) -> bool:
         counts = PPTParserService._text_script_counts(value)
         return counts["cjk"] >= 2 and counts["cjk"] >= counts["latin"]
 
     @staticmethod
+    # 实现 _is_numeric_or_symbolic_text 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _is_numeric_or_symbolic_text(value: str) -> bool:
         counts = PPTParserService._text_script_counts(value)
         return counts["latin"] == 0 and counts["cjk"] == 0
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _normalized_rotation(rotation_deg: object) -> float:
         try:
             rotation = abs(float(rotation_deg or 0.0)) % 360.0
@@ -89,6 +97,7 @@ class PPTParserService:
         return min(rotation, 360.0 - rotation)
 
     @staticmethod
+    # 实现 _is_likely_rotated_watermark 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _is_likely_rotated_watermark(container: dict) -> bool:
         flattened = PPTParserService._flatten_text(str(container.get("text", "") or ""))
         if not flattened or bool(container.get("is_title")):
@@ -101,10 +110,12 @@ class PPTParserService:
         return PPTParserService._is_repeated_pdf_short_phrase(flattened)
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def should_translate_ppt_text_container(
         container: dict,
         repeated_short_phrase_fingerprints: set[str] | None = None,
     ) -> bool:
+        # 翻译前先过滤中文、纯数字符号、页脚水印等内容，避免把无关文本送进模型造成噪声和成本浪费。
         if str(container.get("kind", "") or "") == "image_ocr":
             return True
 
@@ -126,6 +137,7 @@ class PPTParserService:
         return PPTParserService._has_translatable_latin_text(text)
 
     @staticmethod
+    # 实现 filter_ppt_translation_containers 对应的核心处理，封装输入转换、状态更新或结果返回。
     def filter_ppt_translation_containers(
         containers: list[dict],
         repeated_short_phrase_fingerprints: set[str] | None = None,
@@ -143,7 +155,9 @@ class PPTParserService:
         return filtered
 
     @staticmethod
+    # 实现 collect_ppt_repeated_short_phrase_fingerprints 对应的核心处理，封装输入转换、状态更新或结果返回。
     def collect_ppt_repeated_short_phrase_fingerprints(slide_layouts: list[dict]) -> set[str]:
+        # 多页重复出现的短句通常是页脚、版权或模板元素；用指纹统计后在解析阶段统一排除。
         repeated_candidates: Counter[str] = Counter()
         for layout in slide_layouts:
             containers = layout.get("text_containers", []) if isinstance(layout, dict) else []
@@ -166,10 +180,12 @@ class PPTParserService:
         }
 
     @staticmethod
+    # 实现 sanitize_ppt_source_layout 对应的核心处理，封装输入转换、状态更新或结果返回。
     def sanitize_ppt_source_layout(
         source_layout: dict,
         repeated_short_phrase_fingerprints: set[str] | None = None,
     ) -> tuple[str, str, dict]:
+        # 解析得到的原始布局会保留很多模板元素，这里做一次面向翻译任务的清洗。
         slide_width = int(source_layout.get("page_width", 1) or 1)
         slide_height = int(source_layout.get("page_height", 1) or 1)
         containers = source_layout.get("text_containers", []) or []
@@ -180,7 +196,9 @@ class PPTParserService:
         return PPTParserService._finalize_layout(filtered_containers, slide_width, slide_height)
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def should_keep_image_ocr_result(source_text: str, translated_text: str) -> bool:
+        # 图片 OCR 只保留真正有知识含量的英文文本，过滤 logo、水印、坐标轴数字和已经是中文的内容。
         normalized_source = PPTParserService._normalize_text(source_text)
         normalized_translated = PPTParserService._normalize_text(translated_text)
         if not normalized_source or not normalized_translated:
@@ -194,6 +212,7 @@ class PPTParserService:
         return PPTParserService._has_translatable_latin_text(normalized_source)
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _normalize_paragraph_text(paragraph) -> str:
         text = PPTParserService._normalize_text(getattr(paragraph, "text", ""))
         if not text:
@@ -205,6 +224,7 @@ class PPTParserService:
         return f"{indent}{bullet}{text}".rstrip()
 
     @staticmethod
+    # 实现 _shape_placeholder_priority 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _shape_placeholder_priority(shape) -> int:
         if not getattr(shape, "is_placeholder", False):
             return 50
@@ -223,6 +243,7 @@ class PPTParserService:
         return 20
 
     @staticmethod
+    # 实现 _is_title_shape 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _is_title_shape(shape) -> bool:
         if bool(getattr(shape, "is_title", False)):
             return True
@@ -234,6 +255,7 @@ class PPTParserService:
             return False
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _shape_intersects_slide(shape, slide_width: int, slide_height: int) -> bool:
         left = int(getattr(shape, "left", 0) or 0)
         top = int(getattr(shape, "top", 0) or 0)
@@ -246,6 +268,7 @@ class PPTParserService:
         return right > 0 and bottom > 0 and left < slide_width and top < slide_height
 
     @staticmethod
+    # 实现 _should_include_shape 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _should_include_shape(shape, slide_width: int, slide_height: int) -> bool:
         if not PPTParserService._shape_intersects_slide(shape, slide_width, slide_height):
             return False
@@ -258,10 +281,12 @@ class PPTParserService:
         return True
 
     @staticmethod
+    # 实现 _shape_path 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _shape_path(path: list[int]) -> str:
         return ".".join(str(item) for item in path)
 
     @staticmethod
+    # 实现 _container_key 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _container_key(kind: str, shape_path: list[int], row_index: int | None = None, col_index: int | None = None) -> str:
         base = f"{kind}:{PPTParserService._shape_path(shape_path)}"
         if row_index is not None and col_index is not None:
@@ -269,6 +294,7 @@ class PPTParserService:
         return base
 
     @staticmethod
+    # 实现 _append_container 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _append_container(
         containers: list[dict],
         *,
@@ -290,6 +316,7 @@ class PPTParserService:
         allow_empty_text: bool = False,
         rotation_deg: float = 0.0,
     ) -> None:
+        # 坐标保存为 0-1 的比例，而不是像素或 EMU，前端预览、PPT 导出和 PDF 渲染都可以共用。
         normalized_text = PPTParserService._normalize_text(text)
         if not normalized_text and not allow_empty_text:
             return
@@ -316,6 +343,7 @@ class PPTParserService:
         )
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_picture_container(shape, shape_path: list[int], slide_width: int, slide_height: int) -> list[dict]:
         left = int(getattr(shape, "left", 0) or 0)
         top = int(getattr(shape, "top", 0) or 0)
@@ -346,6 +374,7 @@ class PPTParserService:
         return containers
 
     @staticmethod
+    # 实现 _container_to_blocks 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _container_to_blocks(container: dict) -> list[dict]:
         paragraphs = [paragraph for paragraph in container.get("paragraphs", []) if paragraph]
         if not paragraphs:
@@ -374,6 +403,7 @@ class PPTParserService:
         return blocks
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_font_profile(text_frame) -> tuple[str, float]:
         font_name = ""
         paragraph_sizes: list[float] = []
@@ -407,6 +437,7 @@ class PPTParserService:
         return font_name, preferred_size
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_text_frame_container(shape, shape_path: list[int], slide_width: int, slide_height: int) -> list[dict]:
         paragraphs = [PPTParserService._normalize_paragraph_text(paragraph) for paragraph in shape.text_frame.paragraphs]
         paragraphs = [paragraph for paragraph in paragraphs if paragraph]
@@ -438,6 +469,7 @@ class PPTParserService:
         return containers
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_table_containers(shape, shape_path: list[int], slide_width: int, slide_height: int) -> list[dict]:
         containers: list[dict] = []
         rows = len(shape.table.rows) or 1
@@ -484,6 +516,7 @@ class PPTParserService:
         return containers
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_slide_containers(shapes, slide_width: int, slide_height: int, path_prefix: list[int] | None = None) -> list[dict]:
         path_prefix = path_prefix or []
         containers: list[dict] = []
@@ -521,6 +554,7 @@ class PPTParserService:
         return containers
 
     @staticmethod
+    # 实现 _sort_blocks 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _sort_blocks(blocks: list[dict]) -> list[dict]:
         if not blocks:
             return []
@@ -535,6 +569,7 @@ class PPTParserService:
         )
 
     @staticmethod
+    # 实现 _sort_containers 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _sort_containers(containers: list[dict]) -> list[dict]:
         if not containers:
             return []
@@ -548,6 +583,7 @@ class PPTParserService:
         )
 
     @staticmethod
+    # 实现 _finalize_layout 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _finalize_layout(containers: list[dict], slide_width: int, slide_height: int) -> tuple[str, str, dict]:
         sorted_containers = PPTParserService._sort_containers(containers)
         blocks: list[dict] = []
@@ -589,18 +625,22 @@ class PPTParserService:
         )
 
     @staticmethod
+    # 实现 _detect_file_ext 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _detect_file_ext(file_path: str) -> str:
         return str(Path(file_path).suffix or "").strip().lower()
 
     @staticmethod
+    # 实现 is_pdf_file 对应的核心处理，封装输入转换、状态更新或结果返回。
     def is_pdf_file(file_path: str) -> bool:
         return PPTParserService._detect_file_ext(file_path) in set(PPTParserService.PDF_FORMATS)
 
     @staticmethod
+    # 实现 is_ppt_file 对应的核心处理，封装输入转换、状态更新或结果返回。
     def is_ppt_file(file_path: str) -> bool:
         return PPTParserService._detect_file_ext(file_path) in set(PPTParserService.PPT_FORMATS)
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def parse_courseware(file_path: str) -> list[ParsedSlide]:
         suffix = PPTParserService._detect_file_ext(file_path)
         if suffix in PPTParserService.PPT_FORMATS:
@@ -610,6 +650,7 @@ class PPTParserService:
         raise ValueError(f"Only {', '.join(PPTParserService.SUPPORTED_FORMATS)} files are supported.")
 
     @staticmethod
+    # 实现 _safe_float 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _safe_float(value: object, default: float = 0.0) -> float:
         try:
             return float(value)
@@ -617,6 +658,7 @@ class PPTParserService:
             return default
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_pdf_text_block(raw_block: dict) -> tuple[list[str], str, float]:
         lines = raw_block.get("lines", []) if isinstance(raw_block, dict) else []
         paragraphs: list[str] = []
@@ -647,6 +689,7 @@ class PPTParserService:
         return paragraphs, font_name, preferred_size
 
     @staticmethod
+    # 实现 _pdf_text_fingerprint 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _pdf_text_fingerprint(text: str) -> str:
         normalized = PPTParserService._normalize_text(text)
         if not normalized:
@@ -655,6 +698,7 @@ class PPTParserService:
         return normalized
 
     @staticmethod
+    # 实现 _is_repeated_pdf_short_phrase 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _is_repeated_pdf_short_phrase(text: str) -> bool:
         normalized = PPTParserService._normalize_text(text)
         if not normalized:
@@ -676,10 +720,12 @@ class PPTParserService:
         return len(meaningful_chars) >= 2
 
     @staticmethod
+    # 实现 dedupe_pdf_repeated_short_phrases 对应的核心处理，封装输入转换、状态更新或结果返回。
     def dedupe_pdf_repeated_short_phrases(containers: list[dict]) -> list[dict]:
         if not containers:
             return []
 
+        # PDF 文本抽取经常把页码、页眉和页脚当作正文；重复短句只保留第一次，减少总结和问答污染。
         repeated_candidates: Counter[str] = Counter()
         for container in containers:
             if str(container.get("kind", "")) == "image_ocr":
@@ -716,6 +762,7 @@ class PPTParserService:
         return deduped
 
     @staticmethod
+    # 实现 _mark_pdf_titles 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _mark_pdf_titles(containers: list[dict]) -> None:
         text_containers = [item for item in containers if str(item.get("kind", "")) != "image_ocr" and str(item.get("text", "")).strip()]
         if not text_containers:
@@ -757,6 +804,7 @@ class PPTParserService:
             title_candidate["is_title"] = True
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def parse_pdf(file_path: str) -> list[ParsedSlide]:
         path = Path(file_path)
         if path.suffix.lower() not in set(PPTParserService.PDF_FORMATS):
@@ -774,6 +822,7 @@ class PPTParserService:
             total_deduped_containers = 0
 
             for index, page in enumerate(document, start=1):
+                # PDF 没有 PPT 的 shape 结构，只能按文本块和图片块重建近似布局，后续再按坐标覆盖译文。
                 page_rect = page.rect
                 page_width = max(PPTParserService._safe_float(page_rect.width, 1.0), 1.0)
                 page_height = max(PPTParserService._safe_float(page_rect.height, 1.0), 1.0)
@@ -898,6 +947,7 @@ class PPTParserService:
                     pass
 
     @staticmethod
+    # 实现 _convert_ppt_to_pptx 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _convert_ppt_to_pptx(ppt_path: str) -> str:
         try:
             import pythoncom
@@ -945,6 +995,7 @@ class PPTParserService:
             raise
 
     @staticmethod
+    # 实现 ensure_editable_pptx 对应的核心处理，封装输入转换、状态更新或结果返回。
     def ensure_editable_pptx(file_path: str) -> tuple[str, Path | None]:
         path = Path(file_path)
         if path.suffix.lower() == ".pptx":
@@ -953,6 +1004,7 @@ class PPTParserService:
         return str(converted_path), converted_path
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def parse_pptx(file_path: str) -> list[ParsedSlide]:
         path = Path(file_path)
         temp_pptx: Path | None = None
@@ -968,6 +1020,7 @@ class PPTParserService:
             slide_height = int(prs.slide_height or 1)
 
             for index, slide in enumerate(prs.slides, start=1):
+                # PPTX 保留 shape、表格、占位符和备注信息，解析时尽量把可编辑结构保存下来，方便回写导出。
                 containers = PPTParserService._extract_slide_containers(slide.shapes, slide_width, slide_height)
                 title, source_text, source_layout = PPTParserService._finalize_layout(
                     containers,
@@ -1055,6 +1108,7 @@ class PPTParserService:
             raise
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def extract_courseware_title(file_path: str, parsed_slides: list[ParsedSlide] | None = None) -> str:
         path = Path(file_path)
         fallback_title = path.stem

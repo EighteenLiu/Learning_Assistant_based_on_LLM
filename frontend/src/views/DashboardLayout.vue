@@ -105,6 +105,7 @@ const currentCoursewareTitle = computed(() => {
   return current?.title || "尚未选择课件";
 });
 
+// 实现 emitSelectionChanged 对应的核心处理，封装输入转换、状态更新或结果返回。
 const emitSelectionChanged = () => {
   window.dispatchEvent(
     new CustomEvent(selectionEventName, {
@@ -113,6 +114,7 @@ const emitSelectionChanged = () => {
   );
 };
 
+// 实现 syncCourseware 对应的核心处理，封装输入转换、状态更新或结果返回。
 const syncCourseware = async () => {
   if (selectedCoursewareId.value) {
     localStorage.setItem("selected_courseware_id", String(selectedCoursewareId.value));
@@ -122,11 +124,13 @@ const syncCourseware = async () => {
   emitSelectionChanged();
 };
 
+// 实现 handleExternalSelectionChange 对应的核心处理，封装输入转换、状态更新或结果返回。
 const handleExternalSelectionChange = () => {
   const stored = localStorage.getItem("selected_courseware_id");
   selectedCoursewareId.value = stored ? Number(stored) : undefined;
 };
 
+// 实现 fetchCoursewares 对应的核心处理，封装输入转换、状态更新或结果返回。
 const fetchCoursewares = async () => {
   try {
     const { data } = await http.get<CoursewareItem[]>("/coursewares");
@@ -150,6 +154,7 @@ const fetchCoursewares = async () => {
   }
 };
 
+// 实现 logout 对应的核心处理，封装输入转换、状态更新或结果返回。
 const logout = () => {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
@@ -159,6 +164,7 @@ const logout = () => {
   router.push("/login");
 };
 
+// 实现 handleUserCommand 对应的核心处理，封装输入转换、状态更新或结果返回。
 const handleUserCommand = async (command: string) => {
   if (command === "logout") {
     logout();

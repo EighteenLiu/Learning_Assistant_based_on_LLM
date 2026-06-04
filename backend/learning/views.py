@@ -35,6 +35,7 @@ from .services.vector_index_service import VectorIndexService
 from app.debug_logger import debug_log
 
 
+# 实现 sync_courseware_title_from_file 对应的核心处理，封装输入转换、状态更新或结果返回。
 def sync_courseware_title_from_file(courseware: Courseware) -> None:
     # Keep the upload-time title as source of truth (preserves original filename
     # and duplicate numbering like "(2)"), only backfill when title is empty.
@@ -46,7 +47,9 @@ def sync_courseware_title_from_file(courseware: Courseware) -> None:
         courseware.save(update_fields=["title", "updated_at"])
 
 
+# 实现数据规范化和结构构建，让调用方获得稳定的输出。
 def build_courseware_progress(courseware: Courseware) -> dict:
+    # 进度统计不能只看 translated_text：无文字页本身不需要翻译，也应算作已处理，避免前端进度卡在最后几页。
     slides = list(courseware.slides.only("slide_no", "translation_done", "preview_done", "source_text", "source_layout"))
     total = len(slides)
     translated = 0
@@ -72,7 +75,9 @@ def build_courseware_progress(courseware: Courseware) -> dict:
     }
 
 
+# 实现数据规范化和结构构建，让调用方获得稳定的输出。
 def build_translation_duration_seconds(courseware: Courseware) -> int | None:
+    # 翻译中实时计算耗时，完成后优先使用落库值，保证刷新页面时展示一致。
     started_at = courseware.translation_started_at
     if not started_at:
         return courseware.translation_duration_seconds
@@ -83,7 +88,9 @@ def build_translation_duration_seconds(courseware: Courseware) -> int | None:
     return max(int((timezone.now() - started_at).total_seconds()), 0)
 
 
+# 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
 def build_translated_slides_data(slides: list[SlideContent]) -> list[dict]:
+    # 导出服务只需要原图、源布局和译文布局，避免把整个 ORM 对象传进文件处理层造成隐式数据库访问。
     return [
         {
             "slide_no": slide.slide_no,
@@ -96,7 +103,9 @@ def build_translated_slides_data(slides: list[SlideContent]) -> list[dict]:
     ]
 
 
+# 实现问答上下文构建和结果整理，保证回答与课件内容关联。
 def run_post_translation_tasks(courseware_id: int, owner_id: int) -> None:
+    # 翻译完成后的预览渲染和向量索引重建耗时较长，拆到独立后台任务，避免阻塞翻译接口响应。
     close_old_connections()
     try:
         courseware = Courseware.objects.get(id=courseware_id, owner_id=owner_id)
@@ -121,9 +130,19 @@ def run_post_translation_tasks(courseware_id: int, owner_id: int) -> None:
         )
 
 
+
+class MeView(APIView):
+    """Return current user info to verify token validity."""
+    # 返回当前登录用户的基础信息，用于前端确认访问令牌仍然有效。
+    def get(self, request):
+        return Response({
+            "id": request.user.id,
+            "username": request.user.username,
+        })
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    # 处理 POST 请求，完成参数校验、业务调用和响应封装。
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -143,6 +162,7 @@ class RegisterView(APIView):
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    # 处理 POST 请求，完成参数校验、业务调用和响应封装。
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -165,11 +185,13 @@ class LoginView(APIView):
 class CoursewareUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
+    # 处理 POST 请求，完成参数校验、业务调用和响应封装。
     def post(self, request):
         serializer = CoursewareUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
+            # 上传、解析、渲染封面和创建页记录放在同一事务内，避免课件主表存在但页数据不完整。
             courseware: Courseware = serializer.save(owner=request.user)
             parsed_slides = PPTParserService.parse_courseware(courseware.file.path)
             sync_courseware_title_from_file(courseware)
@@ -195,6 +217,7 @@ class CoursewareUploadView(APIView):
 
 
 class CoursewareListView(APIView):
+    # 处理 GET 请求，按当前用户的权限边界读取数据并返回接口响应。
     def get(self, request):
         coursewares = list(Courseware.objects.filter(owner=request.user).order_by("-updated_at", "-id"))
         for courseware in coursewares:
@@ -219,6 +242,7 @@ class CoursewareListView(APIView):
 
 
 class TranslateCoursewareView(APIView):
+    # 处理 POST 请求，完成参数校验、业务调用和响应封装。
     def post(self, request, pk: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -231,6 +255,7 @@ class TranslateCoursewareView(APIView):
             return Response({"status": courseware.status, "courseware_id": courseware.id}, status=status.HTTP_200_OK)
 
         courseware.status = Courseware.STATUS_TRANSLATING
+        # 每次重新翻译都重置进度字段，前端轮询时才能区分旧任务进度和当前任务进度。
         courseware.last_error = ""
         courseware.translation_started_at = timezone.now()
         courseware.translation_duration_seconds = None
@@ -250,7 +275,9 @@ class TranslateCoursewareView(APIView):
             ]
         )
 
+        # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
         def _translate_job(courseware_id: int, owner_id: int) -> None:
+            # 后台线程重新按 owner_id 取对象，避免跨用户访问，也避免复用请求线程里的数据库连接。
             close_old_connections()
             try:
                 cw = Courseware.objects.get(id=courseware_id, owner_id=owner_id)
@@ -299,6 +326,7 @@ class TranslateCoursewareView(APIView):
 
 
 class CoursewareStatusView(APIView):
+    # 处理 GET 请求，按当前用户的权限边界读取数据并返回接口响应。
     def get(self, request, pk: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -322,6 +350,7 @@ class CoursewareStatusView(APIView):
 
 
 class ExportTranslatedPPTView(APIView):
+    # 处理 GET 请求，按当前用户的权限边界读取数据并返回接口响应。
     def get(self, request, pk: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -333,6 +362,7 @@ class ExportTranslatedPPTView(APIView):
             return Response({"detail": "No translated slides available for export."}, status=status.HTTP_400_BAD_REQUEST)
 
         output_path = ImageProcessingService.translated_output_path(courseware.id, courseware.file.path)
+        # 导出文件按需生成：已存在就复用，减少重复渲染；不存在再根据当前译文布局生成。
         if not output_path.exists():
             generated = ImageProcessingService.export_translated_courseware(
                 courseware.id,
@@ -343,6 +373,7 @@ class ExportTranslatedPPTView(APIView):
                 return Response({"detail": "Failed to generate translated file."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             output_path = generated
 
+        # 文件名需要过滤 Windows/浏览器不接受的字符，避免下载头或本地保存失败。
         safe_title = re.sub(r'[\\/:*?"<>|]+', "_", str(courseware.title or "").strip()) or f"courseware_{courseware.id}"
         filename = f"{safe_title}_translated{output_path.suffix.lower()}"
         content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
@@ -352,6 +383,7 @@ class ExportTranslatedPPTView(APIView):
 
 
 class CoursewareSlidesView(APIView):
+    # 处理 GET 请求，按当前用户的权限边界读取数据并返回接口响应。
     def get(self, request, pk: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -361,6 +393,7 @@ class CoursewareSlidesView(APIView):
 
 
 class TranslateSlideNotesView(APIView):
+    # 处理 POST 请求，完成参数校验、业务调用和响应封装。
     def post(self, request, pk: int, slide_no: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -384,6 +417,7 @@ class TranslateSlideNotesView(APIView):
 
 
 class QAView(APIView):
+    # 处理 POST 请求，完成参数校验、业务调用和响应封装。
     def post(self, request, pk: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -423,6 +457,7 @@ class QAView(APIView):
 
 
 class SummaryView(APIView):
+    # 处理 POST 请求，完成参数校验、业务调用和响应封装。
     def post(self, request, pk: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -460,6 +495,7 @@ class SummaryView(APIView):
 
 
 class RecordsView(APIView):
+    # 处理 GET 请求，按当前用户的权限边界读取数据并返回接口响应。
     def get(self, request, pk: int):
         courseware = Courseware.objects.filter(id=pk, owner=request.user).first()
         if not courseware:
@@ -470,6 +506,7 @@ class RecordsView(APIView):
             many=True,
         ).data
         for item in summary_records:
+            # 旧记录可能没有 learning_suggestions 字段内容，这里即时补一个本地兜底，保证历史数据仍可展示。
             if item.get("learning_suggestions"):
                 continue
             chapter_summary = str(item.get("chapter_summary", "")).strip()

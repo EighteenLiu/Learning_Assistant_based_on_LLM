@@ -54,6 +54,7 @@ const form = reactive({
   password: "",
 });
 
+// 实现 submit 对应的核心处理，封装输入转换、状态更新或结果返回。
 const submit = async () => {
   if (!form.username.trim() || !form.password.trim()) {
     ElMessage.warning("请输入用户名和密码");

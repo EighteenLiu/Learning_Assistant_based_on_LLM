@@ -11,15 +11,18 @@ from .llm_client import ChatMessage, OpenAICompatibleClient
 
 
 class SummaryService:
+    # 初始化当前对象需要的依赖和运行参数。
     def __init__(self):
         self.client = OpenAICompatibleClient()
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_json_payload(content: str) -> str:
         cleaned = (content or "").strip()
         if not cleaned:
             raise ValueError("Empty summary response.")
 
+        # 总结模型偶尔会额外输出说明文字，这里只截取 JSON 主体，保证后续解析逻辑可控。
         fenced = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", cleaned, flags=re.DOTALL)
         if fenced:
             return fenced.group(1).strip()
@@ -39,6 +42,7 @@ class SummaryService:
         return cleaned
 
     @staticmethod
+    # 实现课件总结和学习建议的数据整理，并提供可用的兜底结果。
     def _normalize_mind_map(node, fallback_title: str = "课程全景") -> dict:
         if not isinstance(node, dict):
             return {"title": fallback_title, "children": []}
@@ -52,6 +56,7 @@ class SummaryService:
         return {"title": title, "children": normalized_children}
 
     @staticmethod
+    # 实现 _compact_text 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _compact_text(text: str, max_len: int = 96) -> str:
         normalized = re.sub(r"\s+", " ", str(text or "")).strip()
         if len(normalized) <= max_len:
@@ -59,6 +64,7 @@ class SummaryService:
         return f"{normalized[:max_len].rstrip()}..."
 
     @staticmethod
+    # 实现课件总结和学习建议的数据整理，并提供可用的兜底结果。
     def _normalize_suggestions(values: list[str]) -> list[str]:
         normalized: list[str] = []
         seen: set[str] = set()
@@ -73,11 +79,13 @@ class SummaryService:
         return normalized
 
     @staticmethod
+    # 实现课件总结和学习建议的数据整理，并提供可用的兜底结果。
     def build_learning_suggestions(
         chapter_summary: str,
         key_points: list[str] | None = None,
         term_pairs: list[dict] | None = None,
     ) -> list[str]:
+        # 本地建议作为兜底路径存在：模型失败时仍能返回可用结果，而不是让整个总结接口失败。
         key_points = key_points or []
         term_pairs = term_pairs or []
         clean_points = [str(item or "").strip() for item in key_points if str(item or "").strip()]
@@ -109,6 +117,7 @@ class SummaryService:
         suggestions.append(f"复盘时不要重读全文，直接根据摘要“{anchor}”画出三条因果链，再回到课件查漏补缺。")
         return SummaryService._normalize_suggestions(suggestions)
 
+    # 实现课件总结和学习建议的数据整理，并提供可用的兜底结果。
     def generate_learning_suggestions(
         self,
         chapter_summary: str,
@@ -117,6 +126,7 @@ class SummaryService:
         mind_map: dict | None = None,
         courseware_title: str = "",
     ) -> list[str]:
+        # 先生成本地 fallback，再尝试 LLM；这样任何异常都能退回到确定性结果。
         fallback = self.build_learning_suggestions(chapter_summary, key_points, term_pairs)
         payload = {
             "courseware_title": courseware_title,
@@ -162,6 +172,7 @@ class SummaryService:
         return fallback
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _build_local_fallback(courseware: Courseware, slides: list, reason: str = "") -> tuple[str, list[str], list[dict], dict]:
         title = (courseware.title or "").strip() or "课程全景"
         key_points: list[str] = []
@@ -192,10 +203,12 @@ class SummaryService:
         mind_map = {"title": title, "children": children}
         return chapter_summary, key_points, [], mind_map
 
+    # 实现 generate 对应的核心处理，封装输入转换、状态更新或结果返回。
     def generate(self, courseware: Courseware) -> tuple[str, list[str], list[dict], dict]:
         slides = list(courseware.slides.order_by("slide_no", "id"))
         corpus = []
         for slide in slides:
+            # 优先使用译文参与总结；若尚未翻译完成，则退回原文，保证不同处理阶段都可用。
             text = (slide.translated_text or slide.source_text or "").strip()
             if text:
                 corpus.append(f"[Slide {slide.slide_no}] {text}")

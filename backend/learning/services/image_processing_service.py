@@ -32,12 +32,14 @@ class ImageProcessingService:
     )
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _parse_shape_path(shape_path: str) -> list[int]:
         if not shape_path:
             return []
         return [int(item) for item in str(shape_path).split(".") if item != ""]
 
     @staticmethod
+    # 实现 _find_shape_by_path 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _find_shape_by_path(shapes, shape_path: str):
         indices = ImageProcessingService._parse_shape_path(shape_path)
         current_shapes = shapes
@@ -53,10 +55,12 @@ class ImageProcessingService:
         return current_shape
 
     @staticmethod
+    # 实现 _contains_hangul 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _contains_hangul(text: str) -> bool:
         return any("\uac00" <= char <= "\ud7af" for char in str(text or ""))
 
     @staticmethod
+    # 实现 _preferred_font_info 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _preferred_font_info(text_frame, paragraphs: list[str] | None = None) -> tuple[str, int]:
         font_name = "Microsoft YaHei"
         max_size = 20
@@ -84,6 +88,7 @@ class ImageProcessingService:
         return font_name, max_size
 
     @staticmethod
+    # 实现 _original_font_info 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _original_font_info(
         text_frame,
         paragraphs: list[str] | None = None,
@@ -103,6 +108,7 @@ class ImageProcessingService:
         return resolved_name or "Microsoft YaHei", resolved_size
 
     @staticmethod
+    # 实现 _preferred_font_rgb 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _preferred_font_rgb(text_frame) -> tuple[int, int, int] | None:
         candidates = []
         for paragraph in getattr(text_frame, "paragraphs", []):
@@ -123,6 +129,7 @@ class ImageProcessingService:
         return None
 
     @staticmethod
+    # 实现 _font_candidates 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _font_candidates(font_name: str, text: str = "") -> list[str]:
         lowered = str(font_name or "").lower()
         ordered = []
@@ -158,6 +165,7 @@ class ImageProcessingService:
         return deduped
 
     @staticmethod
+    # 实现 _load_font 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _load_font(font_name: str, font_size: int, text: str = "") -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         for font_path in ImageProcessingService._font_candidates(font_name, text):
             try:
@@ -167,10 +175,12 @@ class ImageProcessingService:
         return ImageFont.load_default()
 
     @staticmethod
+    # 实现 _emu_to_px 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _emu_to_px(value: int) -> int:
         return max(int((value / ImageProcessingService.EMU_PER_INCH) * ImageProcessingService.PIXELS_PER_INCH), 1)
 
     @staticmethod
+    # 实现 _wrap_line 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _wrap_line(font: ImageFont.FreeTypeFont | ImageFont.ImageFont, text: str, max_width: int) -> list[str]:
         if not text:
             return [""]
@@ -191,6 +201,7 @@ class ImageProcessingService:
         return lines or [text]
 
     @staticmethod
+    # 实现 _measure_paragraphs 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _measure_paragraphs(
         font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
         paragraphs: list[str],
@@ -217,6 +228,7 @@ class ImageProcessingService:
         return max(widths or [0]), max(total_height, 1)
 
     @staticmethod
+    # 实现 _available_box_px 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _available_box_px(
         text_frame,
         width_emu: int,
@@ -239,6 +251,7 @@ class ImageProcessingService:
         )
 
     @staticmethod
+    # 实现 _best_fit_font_size 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _best_fit_font_size(
         text_frame,
         paragraphs: list[str],
@@ -251,6 +264,7 @@ class ImageProcessingService:
         paragraph_spacing_px: int = 0,
         margin_pt: float | None = None,
     ) -> tuple[int, bool]:
+        # 通过二分查找字体大小，比逐号递减更快；导出大课件时这个函数会被频繁调用。
         width_emu = int(width_emu or 0)
         height_emu = int(height_emu or 0)
         if not width_emu or not height_emu:
@@ -303,6 +317,7 @@ class ImageProcessingService:
         return best, fits
 
     @staticmethod
+    # 实现 _apply_font_size 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _apply_font_size(
         text_frame,
         font_name: str,
@@ -339,6 +354,7 @@ class ImageProcessingService:
                     pass
 
     @staticmethod
+    # 实现 _relative_luminance 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _relative_luminance(rgb: tuple[int, int, int]) -> float:
         channels = []
         for channel in rgb:
@@ -350,6 +366,7 @@ class ImageProcessingService:
         return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
 
     @staticmethod
+    # 实现 _contrast_ratio 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _contrast_ratio(foreground_rgb: tuple[int, int, int], background_rgb: tuple[int, int, int]) -> float:
         fg = ImageProcessingService._relative_luminance(foreground_rgb)
         bg = ImageProcessingService._relative_luminance(background_rgb)
@@ -358,6 +375,7 @@ class ImageProcessingService:
         return (lighter + 0.05) / (darker + 0.05)
 
     @staticmethod
+    # 实现 _shape_background_rgb 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _shape_background_rgb(host) -> tuple[int, int, int] | None:
         fill = getattr(host, "fill", None)
         if fill is None:
@@ -376,6 +394,7 @@ class ImageProcessingService:
         return None
 
     @staticmethod
+    # 实现 _best_contrast_rgb 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _best_contrast_rgb(
         source_rgb: tuple[int, int, int] | None,
         background_rgb: tuple[int, int, int] | None,
@@ -383,6 +402,7 @@ class ImageProcessingService:
         if background_rgb is None:
             return source_rgb
 
+        # 译文会覆盖到原始背景上，必要时自动换成高对比色，保证导出的课件可读。
         if source_rgb and ImageProcessingService._contrast_ratio(source_rgb, background_rgb) >= ImageProcessingService.CONTRAST_THRESHOLD:
             return source_rgb
 
@@ -401,6 +421,7 @@ class ImageProcessingService:
         return ranked[0] if ranked else source_rgb
 
     @staticmethod
+    # 实现 _apply_font_color 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _apply_font_color(text_frame, rgb: tuple[int, int, int] | None) -> None:
         if rgb is None:
             return
@@ -417,6 +438,7 @@ class ImageProcessingService:
                     pass
 
     @staticmethod
+    # 实现 _resolve_media_path 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _resolve_media_path(media_url: str) -> Path | None:
         normalized = str(media_url or "").strip()
         if not normalized:
@@ -429,6 +451,7 @@ class ImageProcessingService:
         return path if path.exists() else None
 
     @staticmethod
+    # 实现 _sample_background_rgb 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _sample_background_rgb(source_image: Image.Image | None, container: dict) -> tuple[int, int, int] | None:
         if source_image is None:
             return None
@@ -450,6 +473,7 @@ class ImageProcessingService:
             return None
 
     @staticmethod
+    # 实现 _page_text_char_count 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _page_text_char_count(containers: list[dict]) -> int:
         total = 0
         for container in containers:
@@ -460,6 +484,7 @@ class ImageProcessingService:
         return total
 
     @staticmethod
+    # 实现 _set_text_frame_content 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _set_text_frame_content(
         text_frame,
         paragraphs: list[str],
@@ -471,6 +496,7 @@ class ImageProcessingService:
         font_size_hint: float | int | None = None,
         force_compact: bool = False,
     ) -> None:
+        # 这里集中处理字体、换行、缩放和颜色，避免 PPT 文本框、表格单元格、覆盖层各自实现一套规则。
         normalized_paragraphs = [str(item) for item in paragraphs]
         combined_text = "\n".join(normalized_paragraphs).strip()
         font_name, max_size = ImageProcessingService._original_font_info(
@@ -489,6 +515,7 @@ class ImageProcessingService:
             pass
 
         if force_compact:
+            # 文字特别密集的页面优先保证完整显示，因此主动降低字号和边距。
             max_size = min(max_size, ImageProcessingService.LONG_PAGE_MAX_FONT_SIZE)
             layout_candidates = [
                 {"line_spacing_ratio": 0.02, "margin_pt": ImageProcessingService.MIN_MARGIN_PT, "paragraph_spacing_pt": 0, "min_size": 4, "auto_fit": True},
@@ -556,6 +583,7 @@ class ImageProcessingService:
                 pass
 
     @staticmethod
+    # 实现 _apply_container_translation 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _apply_container_translation(
         slide,
         container: dict,
@@ -645,24 +673,28 @@ class ImageProcessingService:
         return False
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def translated_pptx_path(courseware_id: int) -> Path:
         export_dir = Path(settings.MEDIA_ROOT) / "translated_pptx"
         export_dir.mkdir(parents=True, exist_ok=True)
         return export_dir / f"courseware_{courseware_id}_translated.pptx"
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def translated_pdf_path(courseware_id: int) -> Path:
         export_dir = Path(settings.MEDIA_ROOT) / "translated_pdf"
         export_dir.mkdir(parents=True, exist_ok=True)
         return export_dir / f"courseware_{courseware_id}_translated.pdf"
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def translated_output_path(courseware_id: int, source_file_path: str) -> Path:
         if PPTParserService.is_pdf_file(source_file_path):
             return ImageProcessingService.translated_pdf_path(courseware_id)
         return ImageProcessingService.translated_pptx_path(courseware_id)
 
     @staticmethod
+    # 实现 _prepare_output_dir 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _prepare_output_dir(courseware_id: int, output_folder: str) -> Path:
         output_dir = Path(settings.MEDIA_ROOT) / output_folder / f"courseware_{courseware_id}"
         if output_dir.exists():
@@ -671,6 +703,7 @@ class ImageProcessingService:
         return output_dir
 
     @staticmethod
+    # 实现 _container_pixel_rect 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _container_pixel_rect(source_image: Image.Image, container: dict) -> tuple[int, int, int, int]:
         image_width, image_height = source_image.size
         left = max(int(float(container.get("x", 0) or 0) * image_width), 0)
@@ -682,6 +715,7 @@ class ImageProcessingService:
         return left, top, right, bottom
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _best_fit_font_size_for_image(
         paragraphs: list[str],
         font_name: str,
@@ -717,6 +751,7 @@ class ImageProcessingService:
         return best, fits
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _draw_paragraphs_on_image(
         source_image: Image.Image,
         container: dict,
@@ -788,6 +823,7 @@ class ImageProcessingService:
         return True
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _render_translated_images_from_source(
         courseware_id: int,
         slides_data: List[Dict],
@@ -799,6 +835,7 @@ class ImageProcessingService:
         generated_paths: dict[int, Path] = {}
 
         for slide_data in sorted(slides_data, key=lambda item: int(item.get("slide_no") or 0)):
+            # PDF 或不可编辑页面用“原图 + 译文覆盖”的方式生成预览，尽量保留原页面视觉效果。
             slide_no = int(slide_data.get("slide_no") or 0)
             if slide_no <= 0:
                 continue
@@ -840,6 +877,7 @@ class ImageProcessingService:
         return generated_urls, generated_paths
 
     @staticmethod
+    # 实现 _apply_layouts_to_presentation 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _apply_layouts_to_presentation(presentation: Presentation, slides_data: List[Dict]) -> None:
         for slide_data in slides_data:
             slide_no = int(slide_data.get("slide_no") or 0)
@@ -860,6 +898,7 @@ class ImageProcessingService:
                     source_image = None
 
             for container in translated_containers:
+                # 优先回写原 shape/table；如果是图片 OCR 区域，则用覆盖层放置译文。
                 background_rgb = ImageProcessingService._sample_background_rgb(source_image, container)
                 ImageProcessingService._apply_container_translation(
                     slide,
@@ -875,12 +914,14 @@ class ImageProcessingService:
                     pass
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def export_translated_courseware(courseware_id: int, slides_data: List[Dict], source_file_path: str = "") -> Path | None:
         if PPTParserService.is_pdf_file(source_file_path):
             return ImageProcessingService.export_translated_pdf(courseware_id, slides_data, source_file_path)
         return ImageProcessingService.export_translated_pptx(courseware_id, slides_data, source_file_path)
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def export_translated_pptx(courseware_id: int, slides_data: List[Dict], source_ppt_path: str = "") -> Path | None:
         if not source_ppt_path:
             return None
@@ -910,6 +951,7 @@ class ImageProcessingService:
                     pass
 
     @staticmethod
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def export_translated_pdf(courseware_id: int, slides_data: List[Dict], source_pdf_path: str = "") -> Path | None:
         if not source_pdf_path:
             return None
@@ -921,6 +963,7 @@ class ImageProcessingService:
         if not PPTParserService.is_pdf_file(source_pdf_path):
             return None
 
+        # PDF 导出无法像 PPTX 一样编辑对象，因此先渲染每页图片，再把译文覆盖后的图片重新组装成 PDF。
         SlideRenderService.export_slide_images(source_pdf_path, courseware_id, output_folder="rendered_slides")
         _, translated_image_paths = ImageProcessingService._render_translated_images_from_source(
             courseware_id,
@@ -970,9 +1013,11 @@ class ImageProcessingService:
                     pass
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def process_all_slides(courseware_id: int, slides_data: List[Dict], source_ppt_path: str = "") -> Dict[int, str]:
         source_path = str(source_ppt_path or "")
         if PPTParserService.is_pdf_file(source_path):
+            # PDF 预览直接走图片覆盖链路，不依赖 PowerPoint 或 LibreOffice。
             SlideRenderService.export_slide_images(source_path, courseware_id, output_folder="rendered_slides")
             processed_urls, _ = ImageProcessingService._render_translated_images_from_source(
                 courseware_id,

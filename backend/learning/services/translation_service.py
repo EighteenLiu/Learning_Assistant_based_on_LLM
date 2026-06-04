@@ -34,6 +34,7 @@ class TranslationService:
     DEFAULT_SOURCE_LANGUAGE = "en"
     DEFAULT_TARGET_LANGUAGE = "zh"
 
+    # 初始化当前对象需要的依赖和运行参数。
     def __init__(self):
         self.client = OpenAICompatibleClient()
         self.max_workers = max(int(getattr(settings, "TRANSLATION_MAX_WORKERS", 4) or 1), 1)
@@ -57,6 +58,7 @@ class TranslationService:
         )
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _build_term_hint() -> str:
         terms = TermDictionary.objects.all()[:200]
         if not terms:
@@ -65,12 +67,15 @@ class TranslationService:
         return f"Fixed terminology mappings:\n{pairs}"
 
     @staticmethod
+    # 实现 _sha256 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _sha256(text: str) -> str:
         return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
 
+    # 实现缓存读写和命中判断，用于减少重复模型请求。
     def _build_cache_key(self, text: str, term_hint: str, translation_type: str) -> str:
         source_text = (text or "").strip()
         term_hash = self._sha256((term_hint or "").strip())
+        # 缓存维度包含 schema、类型、模型、语种、术语表和原文，确保换模型或改术语表时不会复用旧译文。
         payload = "|".join(
             [
                 self.CACHE_SCHEMA_VERSION,
@@ -84,6 +89,7 @@ class TranslationService:
         )
         return self._sha256(payload)
 
+    # 实现缓存读写和命中判断，用于减少重复模型请求。
     def _cache_lookup(self, text: str, term_hint: str, translation_type: str) -> str | None:
         source_text = (text or "").strip()
         if not source_text:
@@ -102,6 +108,7 @@ class TranslationService:
         translated = (cached.translated_text or "").strip()
         return translated or None
 
+    # 实现缓存读写和命中判断，用于减少重复模型请求。
     def _cache_store(self, text: str, translated_text: str, term_hint: str, translation_type: str) -> None:
         source_text = (text or "").strip()
         translated = (translated_text or "").strip()
@@ -129,6 +136,7 @@ class TranslationService:
         except DatabaseError:
             return
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_text(
         self,
         text: str,
@@ -163,6 +171,7 @@ class TranslationService:
         self._cache_store(src, translated, term_hint, translation_type)
         return translated
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def translate_notes_text(self, text: str, term_hint: str = "") -> str:
         src = (text or "").strip()
         if not src:
@@ -193,11 +202,13 @@ class TranslationService:
         return translated
 
     @staticmethod
+    # 实现课件内容提取，把文本、位置和样式转成后续可用的结构。
     def _extract_json_payload(content: str) -> str:
         cleaned = (content or "").strip()
         if not cleaned:
             raise ValueError("Empty translation response.")
 
+        # LLM 有时会把 JSON 包在 markdown 代码块里；先剥离外壳，再做严格解析，提升接口稳定性。
         fenced = re.match(r"^```(?:json)?\s*(.*?)\s*```$", cleaned, flags=re.DOTALL)
         if fenced:
             return fenced.group(1).strip()
@@ -214,10 +225,12 @@ class TranslationService:
         return cleaned
 
     @staticmethod
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def _normalize_lines(lines: list[str]) -> list[str]:
         return [str(line).strip() for line in lines if str(line).strip()]
 
     @staticmethod
+    # 实现 _resolve_media_path 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _resolve_media_path(media_url: str) -> Path | None:
         normalized = str(media_url or "").strip()
         if not normalized:
@@ -230,12 +243,14 @@ class TranslationService:
         return path if path.exists() else None
 
     @staticmethod
+    # 实现 _container_area_ratio 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _container_area_ratio(container: dict) -> float:
         width = max(float(container.get("w", 0) or 0), 0.0)
         height = max(float(container.get("h", 0) or 0), 0.0)
         return width * height
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _build_image_region_payload(image_path: Path, container: dict) -> tuple[str, str] | None:
         try:
             with Image.open(image_path) as img:
@@ -260,6 +275,7 @@ class TranslationService:
         except Exception:
             return None
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _extract_and_translate_image_region_text(self, image_data_url: str, term_hint: str) -> tuple[str, str]:
         system_prompt = (
             "You are an OCR + translation assistant for course slides. "
@@ -301,6 +317,7 @@ class TranslationService:
             translated_text = str(raw or "").strip()
         return source_text, translated_text
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_image_containers(
         self,
         slide: SlideContent,
@@ -314,6 +331,7 @@ class TranslationService:
         if image_path is None:
             return {}, {}
 
+        # 图片 OCR 成本高且容易误识别，优先处理面积较大的图片区域，并限制每页最多处理数量。
         sorted_candidates = sorted(
             image_containers,
             key=self._container_area_ratio,
@@ -335,6 +353,7 @@ class TranslationService:
             if payload is None:
                 continue
             image_data_url, image_digest = payload
+            # 图片区域缓存不能只看坐标，还要加裁剪后图片摘要；原图变化时缓存会自动失效。
             source_token = (
                 f"imgocr:v3:{slide.id}:{container_id}:{image_digest}:"
                 f"{round(float(container.get('x', 0) or 0), 4)}:"
@@ -397,6 +416,7 @@ class TranslationService:
         return translated_map, source_text_map
 
     @staticmethod
+    # 实现 _split_to_match_paragraphs 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _split_to_match_paragraphs(text: str, source_paragraphs: list[str], translated_paragraphs: list[str] | None = None) -> list[str]:
         source_count = max(len(source_paragraphs), 1)
         cleaned_text = str(text or "").strip()
@@ -426,10 +446,12 @@ class TranslationService:
         merged.append("\n".join(response_lines[source_count - 1 :]).strip())
         return merged
 
+    # 实现 _chunk_payload_containers 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _chunk_payload_containers(self, payload_containers: list[dict]) -> list[list[dict]]:
         if not payload_containers:
             return []
 
+        # 按容器数量和字符数双阈值切块，既控制单次 LLM 请求大小，又尽量保留同页上下文。
         chunks: list[list[dict]] = []
         current_chunk: list[dict] = []
         current_chars = 0
@@ -452,10 +474,12 @@ class TranslationService:
             chunks.append(current_chunk)
         return chunks
 
+    # 实现缓存读写和命中判断，用于减少重复模型请求。
     def _load_cached_containers(self, payload_containers: list[dict], term_hint: str) -> tuple[dict[int, dict], list[dict]]:
         if not payload_containers:
             return {}, []
 
+        # 先批量查缓存，再只翻译未命中的容器；大课件里重复标题和术语很多，这一步能减少请求数。
         containers_by_key: dict[str, list[dict]] = {}
         for container in payload_containers:
             source_text = str(container.get("text", "")).strip()
@@ -490,6 +514,7 @@ class TranslationService:
 
         return cached_map, pending
 
+    # 实现缓存读写和命中判断，用于减少重复模型请求。
     def _cache_container_results(self, payload_containers: list[dict], translated_map: dict[int, dict], term_hint: str) -> None:
         if not payload_containers or not translated_map:
             return
@@ -523,6 +548,7 @@ class TranslationService:
             except DatabaseError:
                 return
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_containers_structured(self, payload_containers: list[dict], term_hint: str, *, is_retry: bool = False) -> dict[int, dict]:
         if not payload_containers:
             return {}
@@ -584,6 +610,7 @@ class TranslationService:
         return translated_map
 
     @staticmethod
+    # 实现 _missing_payload_containers 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _missing_payload_containers(payload_containers: list[dict], translated_map: dict[int, dict]) -> list[dict]:
         missing: list[dict] = []
         for container in payload_containers:
@@ -593,6 +620,7 @@ class TranslationService:
                 missing.append(container)
         return missing
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_container_chunk(self, payload_containers: list[dict], term_hint: str) -> dict[int, dict]:
         translated_map = self._translate_containers_structured(payload_containers, term_hint, is_retry=False)
 
@@ -621,12 +649,14 @@ class TranslationService:
             }
         return translated_map
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_container_chunk_with_retries(
         self,
         payload_containers: list[dict],
         term_hint: str,
         slide: SlideContent | None = None,
     ) -> dict[int, dict]:
+        # 结构化翻译要求返回 container_id 和 paragraphs；失败后重试，避免一个坏响应影响整份课件。
         last_exc: Exception | None = None
         for attempt in range(1, self.chunk_max_retries + 1):
             try:
@@ -655,6 +685,7 @@ class TranslationService:
             raise last_exc
         return {}
 
+    # 实现 _split_long_text_for_translation 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _split_long_text_for_translation(self, text: str) -> list[str]:
         normalized = str(text or "").strip()
         if not normalized:
@@ -691,12 +722,14 @@ class TranslationService:
             chunks.append("\n\n".join(current).strip())
         return [chunk for chunk in chunks if chunk]
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_long_container_text(
         self,
         container: dict,
         term_hint: str,
         slide: SlideContent | None = None,
     ) -> dict:
+        # 超长文本单独处理，避免因为一个大文本框导致整页结构化翻译超过模型上下文限制。
         source_text = str(container.get("text", "")).strip()
         chunks = self._split_long_text_for_translation(source_text)
         if not chunks:
@@ -752,6 +785,7 @@ class TranslationService:
         }
 
     @staticmethod
+    # 实现 _add_translation_chunks 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _add_translation_chunks(courseware_id: int | None, chunk_count: int, slide_no: int | None = None) -> None:
         if not courseware_id or chunk_count <= 0:
             return
@@ -764,9 +798,11 @@ class TranslationService:
             return
 
     @staticmethod
+    # 实现 _mark_translation_chunk_done 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _mark_translation_chunk_done(courseware_id: int | None, slide_no: int | None = None) -> None:
         if not courseware_id:
             return
+        # 用数据库 F 表达式做原子递增，多个翻译线程并发更新进度时不会互相覆盖。
         update_fields = {"translation_completed_chunks": F("translation_completed_chunks") + 1}
         if slide_no:
             update_fields["translation_current_slide_no"] = slide_no
@@ -775,6 +811,7 @@ class TranslationService:
         except DatabaseError:
             return
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_containers(self, containers: list[dict], term_hint: str, slide: SlideContent | None = None) -> dict[int, dict]:
         payload_containers = []
         for container in containers:
@@ -798,6 +835,7 @@ class TranslationService:
         if not pending_containers:
             return translated_map
 
+        # 普通容器走批量结构化翻译，超长容器拆成专门流程，兼顾吞吐量和模型上下文上限。
         normal_pending: list[dict] = []
         long_pending: list[dict] = []
         for container in pending_containers:
@@ -825,6 +863,7 @@ class TranslationService:
             self._mark_translation_chunk_done(courseware_id, slide_no)
         return translated_map
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _build_translated_layout(
         self,
         slide: SlideContent,
@@ -834,6 +873,7 @@ class TranslationService:
         source_layout = copy.deepcopy(slide.source_layout or {})
         source_containers = source_layout.get("text_containers", []) or []
         if not source_containers:
+            # 兼容旧版本数据：早期只保存 blocks，没有 text_containers，这里转换成统一容器结构。
             source_containers = []
             for block in source_layout.get("blocks", []):
                 source_containers.append(
@@ -859,6 +899,7 @@ class TranslationService:
         except Exception:
             is_pdf_source = False
         if is_pdf_source:
+            # PDF 页眉页脚常被解析成每页重复短句，去重后可以减少无意义翻译和预览干扰。
             source_containers = PPTParserService.dedupe_pdf_repeated_short_phrases(source_containers)
         else:
             source_containers = PPTParserService.filter_ppt_translation_containers(
@@ -869,6 +910,7 @@ class TranslationService:
         text_containers = [item for item in source_containers if str(item.get("kind", "")) != "image_ocr"]
         image_containers = [item for item in source_containers if str(item.get("kind", "")) == "image_ocr"]
 
+        # 文本框和图片内文字分两条链路处理，最后按 container_id 合并回同一个 translated_layout。
         translated_map = self._translate_containers(text_containers, term_hint, slide=slide)
         image_translated_map, image_source_text_map = self._translate_image_containers(slide, image_containers, term_hint)
         translated_map.update(image_translated_map)
@@ -907,6 +949,7 @@ class TranslationService:
                 translated_texts.append(translated_text)
 
             paragraph_height = float(source_container.get("h", 0) or 0) / max(len(translated_paragraphs), 1)
+            # blocks 是给前端快速预览用的轻量结构；text_containers 保留导出时需要的原始形状信息。
             for paragraph_index, paragraph_text in enumerate(translated_paragraphs):
                 translated_blocks.append(
                     {
@@ -963,10 +1006,12 @@ class TranslationService:
 
         enhanced_source_text = base_source_text
         if deduped_ocr:
+            # OCR 文本补进 source_text，后续总结和问答才能检索到图片里的知识点。
             ocr_block = "[Image OCR]\n" + "\n".join(deduped_ocr)
             enhanced_source_text = "\n\n".join([part for part in [base_source_text, ocr_block] if part]).strip()
         return "\n".join(translated_texts).strip(), translated_layout, enhanced_source_text
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def _translate_single_slide(
         self,
         slide: SlideContent,
@@ -981,10 +1026,12 @@ class TranslationService:
         return slide.id, translated_text, translated_layout, enhanced_source_text
 
     @staticmethod
+    # 实现 _sanitize_error_text 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _sanitize_error_text(exc: Exception) -> str:
         return " ".join(str(exc).split())[:240]
 
     @staticmethod
+    # 实现 _has_textual_source 对应的核心处理，封装输入转换、状态更新或结果返回。
     def _has_textual_source(source_text: str, source_layout: dict | None) -> bool:
         if str(source_text or "").strip():
             return True
@@ -997,6 +1044,7 @@ class TranslationService:
                 return True
         return False
 
+    # 实现课件总结和学习建议的数据整理，并提供可用的兜底结果。
     def _build_failure_summary(self, failed_slides: list[tuple[int, Exception]], total: int) -> str:
         if not failed_slides:
             return ""
@@ -1007,6 +1055,7 @@ class TranslationService:
             f"首个失败页：第 {first_slide_no} 页。错误：{first_error}"
         )
 
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _mark_slide_translation_result(
         self,
         slide: SlideContent,
@@ -1015,6 +1064,7 @@ class TranslationService:
         source_text: str,
     ) -> bool:
         has_source = self._has_textual_source(source_text, slide.source_layout or {})
+        # 没有可翻译文本的图片页也标记完成，否则进度统计会误认为任务一直没结束。
         is_done = bool((translated_text or "").strip()) or not has_source
         slide.source_text = source_text
         slide.translated_text = translated_text
@@ -1028,10 +1078,13 @@ class TranslationService:
         return is_done
 
     @staticmethod
+    # 实现课件预览或导出处理，把布局数据转换为可视化结果。
     def _mark_slide_translation_failed(slide: SlideContent) -> None:
         SlideContent.objects.filter(id=slide.id).update(translation_done=False)
 
+    # 实现数据规范化和结构构建，让调用方获得稳定的输出。
     def build_processed_previews(self, courseware: Courseware, slides: list[SlideContent]) -> None:
+        # 预览图是异步生成的派生产物，失败不影响 translated_layout 入库，用户仍可导出或重试。
         slides_data = [
             {
                 "slide_no": slide.slide_no,
@@ -1054,6 +1107,7 @@ class TranslationService:
         if slides_to_update:
             SlideContent.objects.bulk_update(slides_to_update, ["processed_image_url", "preview_done"])
 
+    # 实现翻译处理步骤，负责组织输入、调用模型并整理译文结果。
     def translate_courseware(self, courseware: Courseware):
         term_hint = self._build_term_hint()
         slides = list(courseware.slides.order_by("slide_no", "id"))
@@ -1075,6 +1129,7 @@ class TranslationService:
 
         try:
             if PPTParserService.is_ppt_file(courseware.file.path):
+                # PPT 中重复短句通常是页脚、版权或装饰文字，预先收集指纹后统一过滤。
                 repeated_short_phrase_fingerprints = PPTParserService.collect_ppt_repeated_short_phrase_fingerprints(
                     [slide.source_layout or {} for slide in slides]
                 )
@@ -1083,6 +1138,7 @@ class TranslationService:
 
         max_workers = min(self.max_workers, len(slides))
         if max_workers <= 1:
+            # 单线程路径便于调试和低配置部署；并发数配置为 1 时不会走线程池。
             for slide in slides:
                 try:
                     _, translated_text, translated_layout, enhanced_source_text = self._translate_single_slide(
@@ -1108,6 +1164,7 @@ class TranslationService:
                         },
                     )
         else:
+            # 采用滑动窗口式并发：始终保持最多 max_workers 个任务在跑，完成一页就补下一页。
             pending_slides = iter(slides)
             future_map: dict = {}
             executor = ThreadPoolExecutor(max_workers=max_workers)
